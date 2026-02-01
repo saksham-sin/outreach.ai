@@ -29,16 +29,34 @@ export function ProfilePage() {
     }
   }, [user]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveProfile = async () => {
     setIsLoading(true);
-
     try {
-      await authApi.updateProfile(formData);
+      await authApi.updateProfile({
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        job_title: formData.job_title,
+        company_name: formData.company_name,
+      });
       await refreshUser();
       toast.success('Profile updated successfully');
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to update profile');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveSignature = async () => {
+    setIsLoading(true);
+    try {
+      await authApi.updateProfile({
+        email_signature: formData.email_signature,
+      });
+      await refreshUser();
+      toast.success('Signature saved successfully');
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to save signature');
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +99,7 @@ export function ProfilePage() {
           <p className="text-gray-600 mt-2">Manage your account information and email signature</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-6">
           {/* Basic Info Card */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Basic Information</h2>
@@ -146,6 +164,18 @@ export function ProfilePage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
               />
             </div>
+            
+            {/* Save Profile Button */}
+            <div className="flex justify-end mt-6 pt-4 border-t">
+              <button
+                type="button"
+                onClick={handleSaveProfile}
+                disabled={isLoading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
           </div>
 
           {/* Email Signature Card */}
@@ -196,26 +226,31 @@ export function ProfilePage() {
                 </div>
               </div>
             )}
+            
+            {/* Save Signature Button */}
+            <div className="flex justify-end mt-6 pt-4 border-t">
+              <button
+                type="button"
+                onClick={handleSaveSignature}
+                disabled={isLoading || !formData.email_signature}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoading ? 'Saving...' : 'Save Signature'}
+              </button>
+            </div>
           </div>
+        </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
+        {/* Back to Dashboard Button */}
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
       </div>
     </div>
   );
