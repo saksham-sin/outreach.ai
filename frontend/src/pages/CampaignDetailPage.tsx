@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { campaignsApi, leadsApi, jobsApi } from '../api';
+import { campaignsApi, leadsApi, jobsApi, templatesApi } from '../api';
 import { useInterval } from '../hooks';
 import {
   Button,
@@ -12,7 +12,7 @@ import {
   EmptyState,
 } from '../components';
 import { CampaignStatus, LeadStatus } from '../types';
-import type { CampaignWithStats, Lead } from '../types';
+import type { CampaignWithStats, Lead, EmailTemplate } from '../types';
 import toast from 'react-hot-toast';
 
 // Read from environment, default to 30 seconds
@@ -24,6 +24,7 @@ export function CampaignDetailPage() {
 
   const [campaign, setCampaign] = useState<CampaignWithStats | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showPauseConfirm, setShowPauseConfirm] = useState(false);
@@ -40,13 +41,15 @@ export function CampaignDetailPage() {
     if (!id) return;
 
     try {
-      const [campaignData, leadsData, failedJobs] = await Promise.all([
+      const [campaignData, leadsData, failedJobs, templatesData] = await Promise.all([
         campaignsApi.get(id),
         leadsApi.list(id, { limit: 500 }),
         jobsApi.getFailedJobs(id),
+        templatesApi.list(id),
       ]);
       setCampaign(campaignData);
       setLeads(leadsData.leads);
+      setTemplates(templatesData.templates);
       
       // Build mapping of lead_id -> job_id for failed jobs
       const jobMapping: Record<string, string> = {};
@@ -289,6 +292,37 @@ export function CampaignDetailPage() {
           />
           <StatCard label="Failed" value={campaign.failed_leads} color="red" />
         </div>
+
+        {/* Email Sequence Preview */}
+        {templates.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Sequence</h2>
+            <div className="space-y-4">
+              {templates.map((template) => (
+                <div key={template.id} className="flex items-start gap-4 pb-4 border-b last:border-b-0 last:pb-0">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-semibold text-blue-700">{template.step_number}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-sm font-medium text-gray-900 truncate">
+                        {template.subject}
+                      </h3>
+                      {template.delay_days > 0 && (
+                        <span className="text-xs text-gray-500">
+                          (Wait {template.delay_days} {template.delay_days === 1 ? 'day' : 'days'})
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 line-clamp-2">
+                      {template.body.replace(/<[^>]*>/g, '').substring(0, 150)}...
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Leads Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
