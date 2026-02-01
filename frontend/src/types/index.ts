@@ -35,6 +35,12 @@ export interface User {
   id: string;
   email: string;
   created_at: string;
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
+  job_title?: string;
+  email_signature?: string;
+  updated_at?: string;
 }
 
 // ===== Auth =====
@@ -135,6 +141,14 @@ export interface EmailTemplate {
 
 export interface TemplateListResponse {
   templates: EmailTemplate[];
+}
+
+export interface PreviewResponse {
+  subject: string;
+  body: string;
+  lead_email: string;
+  lead_name: string;
+  lead_company: string;
 }
 
 export interface EmailTemplateCreate {

@@ -1,7 +1,7 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, ProtectedRoute } from './auth';
-import { LoginPage, VerifyPage, DashboardPage, CampaignDetailPage } from './pages';
+import { LoginPage, VerifyPage, DashboardPage, CampaignDetailPage, ProfilePage } from './pages';
 import { CampaignWizard } from './campaigns';
 
 function App() {
@@ -43,6 +43,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CampaignWizard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
               </ProtectedRoute>
             }
           />

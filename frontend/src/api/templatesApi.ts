@@ -98,6 +98,19 @@ export const templatesApi = {
     );
     return response.data;
   },
+
+  /**
+   * Preview a template with real lead data and signature
+   */
+  preview: async (
+    campaignId: string,
+    templateId: string
+  ): Promise<import('../types').PreviewResponse> => {
+    const response = await apiClient.get<import('../types').PreviewResponse>(
+      `/campaigns/${campaignId}/templates/${templateId}/preview`
+    );
+    return response.data;
+  },
 };
 
 export default templatesApi;
