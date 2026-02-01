@@ -97,6 +97,36 @@ Campaign Context:
 Maintain the same placeholders ({{first_name}}, {{company}}) in appropriate places.
 Follow the rewrite instructions while keeping the email professional and effective."""
 
+# Template for generating email signature
+SIGNATURE_GENERATION_SYSTEM_PROMPT = """You are an expert at creating professional email signatures in HTML format.
+Your signatures should:
+- Be clean, professional, and modern
+- Use simple HTML with inline styles for maximum email client compatibility
+- Include all provided information in a clear hierarchy
+- Be compact but readable
+- Not include images, logos, or external resources
+- Use professional fonts and colors (blues, grays)
+- Be responsive and work in all email clients"""
+
+SIGNATURE_GENERATION_PROMPT = """Create a professional HTML email signature with the following information:
+
+Full Name: {full_name}
+Job Title: {job_title}
+Company Name: {company_name}
+Email: {email}
+
+Requirements:
+- Use a clean, modern layout with proper spacing
+- Name should be prominent (bold, slightly larger)
+- Job title and company on separate lines
+- Email as a clickable mailto: link
+- Use professional color scheme (navy/gray tones)
+- Keep it compact (3-4 lines total)
+- Use inline CSS only, no external stylesheets
+- Ensure compatibility with Gmail, Outlook, Apple Mail
+
+Return ONLY the HTML code, no explanations or markdown formatting."""
+
 # Tone descriptions for LLM context
 TONE_DESCRIPTIONS = {
     "professional": "Formal, business-appropriate language. Respectful and straightforward.",

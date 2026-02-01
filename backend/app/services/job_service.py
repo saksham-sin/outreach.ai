@@ -13,6 +13,7 @@ from app.models.email_job import EmailJob, EmailJobCreate
 from app.models.lead import Lead
 from app.models.campaign import Campaign
 from app.models.email_template import EmailTemplate
+from app.models.user import User
 from app.domain.enums import JobStatus, LeadStatus, CampaignStatus
 from app.infrastructure.email_factory import get_email_provider
 from app.infrastructure.email_provider import EmailMetadata, EmailProviderError
@@ -191,6 +192,23 @@ class JobService:
         # Substitute placeholders
         subject = self._substitute_placeholders(template.subject, job.lead)
         body = self._substitute_placeholders(template.body, job.lead)
+        
+        # Fetch campaign to get user_id
+        campaign_result = await self.session.execute(
+            select(Campaign).where(Campaign.id == job.campaign_id)
+        )
+        campaign = campaign_result.scalar_one_or_none()
+        
+        # Append user signature if available
+        if campaign:
+            user_result = await self.session.execute(
+                select(User).where(User.id == campaign.user_id)
+            )
+            user = user_result.scalar_one_or_none()
+            
+            if user and user.email_signature:
+                # Append signature with spacing
+                body = f"{body}\n\n{user.email_signature}"
         
         # Send email using the configured email provider
         metadata = EmailMetadata(

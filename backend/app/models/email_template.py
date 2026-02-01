@@ -18,6 +18,58 @@ class EmailTemplateBase(SQLModel):
     body: str = Field(max_length=10000)  # HTML body
     delay_days: int = Field(default=0, ge=0)  # Days to wait before sending (for steps > 1)
 
+    @staticmethod
+    def convert_delay_to_seconds(value: int, unit: str) -> int:
+        """
+        Convert delay from given unit to seconds.
+        
+        Args:
+            value: Delay value
+            unit: 'minutes', 'hours', or 'days'
+            
+        Returns:
+            Delay in seconds
+        """
+        if unit == "minutes":
+            return value * 60
+        elif unit == "hours":
+            return value * 3600
+        elif unit == "days":
+            return value * 86400
+        else:
+            raise ValueError(f"Invalid delay unit: {unit}")
+    
+    @staticmethod
+    def convert_seconds_to_delay(seconds: int, unit: str) -> int:
+        """
+        Convert seconds to specified delay unit.
+        
+        Args:
+            seconds: Delay in seconds
+            unit: 'minutes', 'hours', or 'days'
+            
+        Returns:
+            Delay value in the specified unit
+        """
+        if unit == "minutes":
+            return seconds // 60
+        elif unit == "hours":
+            return seconds // 3600
+        elif unit == "days":
+            return seconds // 86400
+        else:
+            raise ValueError(f"Invalid delay unit: {unit}")
+    
+    @staticmethod
+    def delay_days_to_seconds(days: int) -> int:
+        """Convert delay_days to seconds for backward compatibility."""
+        return days * 86400
+    
+    @staticmethod
+    def seconds_to_delay_days(seconds: int) -> int:
+        """Convert seconds to days for backward compatibility."""
+        return seconds // 86400
+
 
 class EmailTemplate(EmailTemplateBase, table=True):
     """Email template database model."""

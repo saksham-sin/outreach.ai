@@ -12,6 +12,10 @@ from app.models.email_template import (
     EmailTemplateUpdate,
     EmailTemplateRead,
 )
+from app.models.lead import Lead
+from app.models.user import User
+from app.models.campaign import Campaign
+from sqlalchemy import select
 
 router = APIRouter(prefix="/campaigns/{campaign_id}/templates", tags=["Templates"])
 
@@ -34,6 +38,15 @@ class GenerateAllTemplatesRequest(BaseModel):
 class RewriteTemplateRequest(BaseModel):
     """Request to rewrite a template using AI."""
     instructions: str
+
+
+class PreviewResponse(BaseModel):
+    """Response containing preview of email with real data."""
+    subject: str
+    body: str
+    lead_email: str
+    lead_name: str
+    lead_company: str
 
 
 @router.post(
@@ -329,3 +342,83 @@ async def rewrite_template(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+
+@router.get(
+    "/{template_id}/preview",
+    response_model=PreviewResponse,
+    summary="Preview template with real lead data",
+    description="Preview an email template with the first lead's data and user signature.",
+)
+async def preview_template(
+    campaign_id: UUID,
+    template_id: UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> PreviewResponse:
+    """
+    Preview a template with real lead data from the first lead in the campaign.
+    Includes placeholder substitution and signature appending.
+    """
+    # Fetch template
+    service = TemplateService(session)
+    template = await service.get_template(template_id, current_user.id)
+    
+    if not template or template.campaign_id != campaign_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Template not found",
+        )
+    
+    # Get campaign to verify ownership
+    campaign_result = await session.execute(
+        select(Campaign).where(Campaign.id == campaign_id)
+    )
+    campaign = campaign_result.scalar_one_or_none()
+    
+    if not campaign or campaign.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        )
+    
+    # Get first lead for preview data
+    lead_result = await session.execute(
+        select(Lead)
+        .where(Lead.campaign_id == campaign_id)
+        .limit(1)
+    )
+    lead = lead_result.scalar_one_or_none()
+    
+    if not lead:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No leads found in campaign for preview",
+        )
+    
+    # Substitute placeholders
+    def substitute(text: str) -> str:
+        return (
+            text.replace("{{first_name}}", lead.first_name or "")
+            .replace("{{company}}", lead.company or "")
+        )
+    
+    subject = substitute(template.subject)
+    body = substitute(template.body)
+    
+    # Fetch user and append signature if available
+    user_result = await session.execute(
+        select(User).where(User.id == current_user.id)
+    )
+    user = user_result.scalar_one_or_none()
+    
+    if user and user.email_signature:
+        body = f"{body}\n\n{user.email_signature}"
+    
+    return PreviewResponse(
+        subject=subject,
+        body=body,
+        lead_email=lead.email,
+        lead_name=lead.first_name or "Unknown",
+        lead_company=lead.company or "Unknown",
+    )

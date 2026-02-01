@@ -18,6 +18,8 @@ from app.core.prompts import (
     REWRITE_EMAIL_PROMPT,
     TONE_DESCRIPTIONS,
     DEFAULT_TONE,
+    SIGNATURE_GENERATION_SYSTEM_PROMPT,
+    SIGNATURE_GENERATION_PROMPT,
 )
 from app.domain.enums import EmailTone
 
@@ -44,6 +46,14 @@ class EnhancedPitch(BaseModel):
     )
 
 
+class GeneratedSignature(BaseModel):
+    """Structured output schema for AI-generated email signatures."""
+
+    signature_html: str = Field(
+        description="Professional HTML email signature with inline styles"
+    )
+
+
 class LLMClient:
     """Client for AI email generation using LangChain and OpenAI."""
 
@@ -55,6 +65,7 @@ class LLMClient:
         )
         self.structured_llm = self.llm.with_structured_output(GeneratedEmail)
         self.pitch_llm = self.llm.with_structured_output(EnhancedPitch)
+        self.signature_llm = self.llm.with_structured_output(GeneratedSignature)
 
     def _get_step_prompt(self, step_number: int) -> str:
         """Get the appropriate prompt template for a step number."""
@@ -195,6 +206,45 @@ class LLMClient:
             return result.pitch.strip()
         except Exception as e:
             logger.error(f"Error enhancing pitch: {str(e)}")
+            raise
+
+    async def generate_signature(
+        self,
+        full_name: str,
+        job_title: str,
+        company_name: str,
+        email: str,
+    ) -> str:
+        """
+        Generate a professional HTML email signature.
+
+        Args:
+            full_name: User's full name
+            job_title: User's job title
+            company_name: User's company name
+            email: User's email address
+
+        Returns:
+            HTML email signature with inline styles
+        """
+        user_prompt = SIGNATURE_GENERATION_PROMPT.format(
+            full_name=full_name,
+            job_title=job_title,
+            company_name=company_name,
+            email=email,
+        )
+
+        messages = [
+            SystemMessage(content=SIGNATURE_GENERATION_SYSTEM_PROMPT),
+            HumanMessage(content=user_prompt),
+        ]
+
+        try:
+            result: GeneratedSignature = await self.signature_llm.ainvoke(messages)
+            logger.info(f"Generated email signature for {full_name}")
+            return result.signature_html.strip()
+        except Exception as e:
+            logger.error(f"Error generating signature: {str(e)}")
             raise
 
 
