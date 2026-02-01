@@ -6,7 +6,7 @@ import { toast } from 'react-hot-toast';
 
 export function ProfilePage() {
   const navigate = useNavigate();
-  const { user, setUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [formData, setFormData] = useState<UserProfileUpdate>({
@@ -34,8 +34,8 @@ export function ProfilePage() {
     setIsLoading(true);
 
     try {
-      const updatedUser = await authApi.updateProfile(formData);
-      setUser(updatedUser);
+      await authApi.updateProfile(formData);
+      await refreshUser();
       toast.success('Profile updated successfully');
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to update profile');
