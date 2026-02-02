@@ -8,9 +8,16 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+# Normalize DB URL to use asyncpg driver for async SQLAlchemy
+db_url = settings.DATABASE_URL
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+elif db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    db_url,
     echo=False,  # Set to True for SQL logging in development
     future=True,
 )
