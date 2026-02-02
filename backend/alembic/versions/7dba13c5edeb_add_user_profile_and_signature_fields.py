@@ -1,7 +1,7 @@
 """add user profile and signature fields
 
 Revision ID: 7dba13c5edeb
-Revises: 005_add_sent_at_index
+Revises: 004_add_delay_minutes
 Create Date: 2026-02-02 01:49:53.332339
 
 """
