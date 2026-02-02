@@ -47,6 +47,19 @@ def upgrade() -> None:
     op.create_index(op.f('ix_campaigns_user_id'), 'campaigns', ['user_id'], unique=False)
     op.create_index(op.f('ix_campaigns_status'), 'campaigns', ['status'], unique=False)
 
+    # Create campaign_tags table
+    op.create_table(
+        'campaign_tags',
+        sa.Column('id', sa.Uuid(), nullable=False),
+        sa.Column('campaign_id', sa.Uuid(), nullable=False),
+        sa.Column('tag', sqlmodel.sql.sqltypes.AutoString(length=100), nullable=False),
+        sa.Column('created_at', sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(['campaign_id'], ['campaigns.id'], ),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_campaign_tags_campaign_id'), 'campaign_tags', ['campaign_id'], unique=False)
+    op.create_index(op.f('ix_campaign_tags_tag'), 'campaign_tags', ['tag'], unique=False)
+
     # Create leads table
     op.create_table(
         'leads',
@@ -127,6 +140,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_leads_email'), table_name='leads')
     op.drop_index(op.f('ix_leads_campaign_id'), table_name='leads')
     
+    op.drop_index(op.f('ix_campaign_tags_tag'), table_name='campaign_tags')
+    op.drop_index(op.f('ix_campaign_tags_campaign_id'), table_name='campaign_tags')
+    
     op.drop_index(op.f('ix_campaigns_status'), table_name='campaigns')
     op.drop_index(op.f('ix_campaigns_user_id'), table_name='campaigns')
     
@@ -136,6 +152,7 @@ def downgrade() -> None:
     op.drop_table('email_jobs')
     op.drop_table('email_templates')
     op.drop_table('leads')
+    op.drop_table('campaign_tags')
     op.drop_table('campaigns')
     op.drop_table('users')
     
