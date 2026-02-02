@@ -13,7 +13,7 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = '7dba13c5edeb'
-down_revision: Union[str, None] = '002_timezone_support'
+down_revision: Union[str, None] = '004_add_delay_minutes'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
