@@ -19,6 +19,7 @@ export function DashboardPage() {
   const [sendingNowId, setSendingNowId] = useState<string | null>(null);
   const [showSendConfirm, setShowSendConfirm] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabFilter>('all');
+  const [selectedTag, setSelectedTag] = useState<string>('all');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -113,6 +114,19 @@ export function DashboardPage() {
     }
   };
 
+  // Get all unique tags from campaigns
+  const allTags = Array.from(
+    new Set(campaigns.flatMap((c) => c.tags || []))
+  ).sort();
+
+  // Filter campaigns by status and tag
+  const filteredCampaigns = campaigns
+    .filter((campaign) => activeTab === 'all' ? true : campaign.status === activeTab)
+    .filter((campaign) => {
+      if (selectedTag === 'all') return true;
+      return campaign.tags?.includes(selectedTag);
+    });
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -169,6 +183,40 @@ export function DashboardPage() {
           </nav>
         </div>
 
+        {/* Tag Filter */}
+        {allTags.length > 0 && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filter by Tag
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedTag('all')}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  selectedTag === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All Tags
+              </button>
+              {allTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(tag)}
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                    selectedTag === tag
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Spinner size="lg" />
@@ -222,11 +270,7 @@ export function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {campaigns
-                  .filter((campaign) =>
-                    activeTab === 'all' ? true : campaign.status === activeTab
-                  )
-                  .map((campaign) => (
+                {filteredCampaigns.map((campaign) => (
                   <tr
                     key={campaign.id}
                     className="hover:bg-gray-50 cursor-pointer"
