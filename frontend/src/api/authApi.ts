@@ -1,6 +1,18 @@
 import apiClient from './client';
 import type { User, AuthTokenResponse } from '../types';
 
+export interface UserProfileUpdate {
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
+  job_title?: string;
+  email_signature?: string;
+}
+
+export interface GenerateSignatureResponse {
+  signature_html: string;
+}
+
 export const authApi = {
   /**
    * Request a magic link to be sent to the email
@@ -23,6 +35,22 @@ export const authApi = {
    */
   getCurrentUser: async (): Promise<User> => {
     const response = await apiClient.get<User>('/auth/me');
+    return response.data;
+  },
+
+  /**
+   * Update user profile
+   */
+  updateProfile: async (data: UserProfileUpdate): Promise<User> => {
+    const response = await apiClient.patch<User>('/auth/me', data);
+    return response.data;
+  },
+
+  /**
+   * Generate AI-powered email signature
+   */
+  generateSignature: async (): Promise<GenerateSignatureResponse> => {
+    const response = await apiClient.post<GenerateSignatureResponse>('/auth/generate-signature');
     return response.data;
   },
 };

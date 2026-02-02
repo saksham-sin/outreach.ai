@@ -12,7 +12,7 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.prompts import MAGIC_LINK_EMAIL_SUBJECT, MAGIC_LINK_EMAIL_BODY
 from app.core.constants import MAGIC_LINK_PATH
-from app.models.user import User, UserCreate, UserRead
+from app.models.user import User, UserCreate, UserRead, UserProfileUpdate
 from app.infrastructure.email_factory import get_email_provider
 from app.infrastructure.email_provider import EmailProviderError
 
@@ -234,3 +234,36 @@ class AuthService:
         
         logger.info(f"User logged in: {email}")
         return user, access_token
+
+    async def update_user_profile(
+        self,
+        user_id: UUID,
+        data: UserProfileUpdate,
+    ) -> Optional[User]:
+        """
+        Update user profile fields.
+        
+        Args:
+            user_id: User's UUID
+            data: Profile update data
+            
+        Returns:
+            Updated user or None if not found
+        """
+        result = await self.session.execute(
+            select(User).where(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return None
+        
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(user, field, value)
+        
+        user.updated_at = datetime.now(timezone.utc)
+        await self.session.flush()
+        
+        logger.info(f"Updated profile for user: {user_id}")
+        return user

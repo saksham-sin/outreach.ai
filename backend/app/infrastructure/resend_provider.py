@@ -26,6 +26,7 @@ class ResendProvider(EmailProvider):
         self.from_email = settings.EMAIL_FROM_ADDRESS
         self.from_name = settings.EMAIL_FROM_NAME
         self.inbound_address = getattr(settings, 'POSTMARK_INBOUND_ADDRESS', None)
+        self.from_domain = settings.RESEND_FROM_DOMAIN
 
     def _get_headers(self) -> dict:
         """Get headers for Resend API requests."""
@@ -53,6 +54,7 @@ class ResendProvider(EmailProvider):
         metadata: Optional[EmailMetadata] = None,
         track_opens: bool = True,
         track_links: bool = True,
+        from_email: Optional[str] = None,
     ) -> EmailResult:
         """
         Send a campaign email via Resend.
@@ -65,12 +67,16 @@ class ResendProvider(EmailProvider):
             metadata: Campaign/lead tracking metadata
             track_opens: Whether to track email opens
             track_links: Whether to track link clicks
+            from_email: Optional custom from email (defaults to self.from_email)
             
         Returns:
             EmailResult with success status and message ID
         """
+        # Use custom from_email if provided, otherwise use configured default
+        email_address = from_email or self.from_email
+        
         payload = {
-            "from": f"{self.from_name} <{self.from_email}>",
+            "from": f"{self.from_name} <{email_address}>",
             "to": [to_email],
             "subject": subject,
             "html": html_body,

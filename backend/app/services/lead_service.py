@@ -60,7 +60,7 @@ class LeadService:
             Created lead
             
         Raises:
-            LeadError: If campaign not found or not owned by user
+            LeadError: If campaign not found or not owned by user or duplicate email
         """
         # Verify campaign ownership and status
         result = await self.session.execute(
@@ -78,9 +78,18 @@ class LeadService:
         if not self._validate_email(data.email):
             raise LeadError(f"Invalid email format: {data.email}")
         
+        # Check for duplicate email in campaign
+        email_normalized = data.email.strip().lower()
+        existing_lead = await self.session.execute(
+            select(Lead)
+            .where(Lead.campaign_id == campaign_id, Lead.email == email_normalized)
+        )
+        if existing_lead.scalar_one_or_none():
+            raise LeadError(f"Email '{data.email}' already exists in this campaign")
+        
         lead = Lead(
             campaign_id=campaign_id,
-            email=data.email.strip().lower(),
+            email=email_normalized,
             first_name=data.first_name.strip() if data.first_name else None,
             company=data.company.strip() if data.company else None,
             status=LeadStatus.PENDING,
@@ -91,6 +100,42 @@ class LeadService:
         
         logger.info(f"Created lead: {lead.id} for campaign {campaign_id}")
         return lead
+
+    async def delete_lead(
+        self,
+        lead_id: UUID,
+        user_id: UUID,
+    ) -> bool:
+        """
+        Delete a lead from a campaign.
+        
+        Args:
+            lead_id: Lead ID to delete
+            user_id: Owner's user ID
+            
+        Returns:
+            True if deleted, False if not found or cannot be deleted
+        """
+        # Get lead and verify ownership via campaign
+        result = await self.session.execute(
+            select(Lead)
+            .join(Campaign)
+            .where(
+                Lead.id == lead_id,
+                Campaign.user_id == user_id,
+                Campaign.status == CampaignStatus.DRAFT,
+            )
+        )
+        lead = result.scalar_one_or_none()
+        
+        if not lead:
+            return False
+        
+        await self.session.delete(lead)
+        await self.session.flush()
+        
+        logger.info(f"Deleted lead: {lead_id}")
+        return True
 
     async def import_leads_csv(
         self,

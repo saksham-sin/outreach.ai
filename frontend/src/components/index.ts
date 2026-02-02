@@ -9,3 +9,4 @@ export { Modal, ConfirmModal } from './Modal';
 export { EmptyState } from './EmptyState';
 export { Header } from './Header';
 export { Countdown } from './Countdown';
+export { EmailPreviewModal } from './EmailPreviewModal';

@@ -13,6 +13,9 @@ Available placeholders you MUST use where appropriate:
 - {{first_name}} - Recipient's first name
 - {{company}} - Recipient's company name
 
+IMPORTANT: Do NOT include any sign-off, closing, or signature (like "Best,", "Regards,", "Sincerely,", "[Your Name]", etc.) 
+at the end of the email. The signature will be automatically added by the system.
+
 Always use placeholders instead of generic terms like "your company" or "you"."""
 
 PITCH_ENHANCEMENT_SYSTEM_PROMPT = """You are an expert B2B copywriter.
@@ -44,8 +47,9 @@ This is the FIRST email in the sequence. Focus on:
 - Opening that grabs attention and shows you've done research
 - Clear value proposition
 - Soft call-to-action (e.g., "Worth a quick chat?")
+- END the email body with the call-to-action question or statement - NO closing salutation
 
-Use {{first_name}} and {{company}} placeholders appropriately."""
+{placeholder_instructions}"""
 
 # Template for generating follow-up email (Step 2)
 STEP_2_EMAIL_PROMPT = """Generate a follow-up email for the following campaign:
@@ -60,8 +64,9 @@ This is the SECOND email (follow-up). Focus on:
 - Brief acknowledgment that you reached out before
 - New angle or additional value point
 - Slightly more direct call-to-action
+- END the email body with the call-to-action question or statement - NO closing salutation
 
-Use {{first_name}} and {{company}} placeholders appropriately."""
+{placeholder_instructions}"""
 
 # Template for generating final follow-up email (Step 3)
 STEP_3_EMAIL_PROMPT = """Generate a final follow-up email for the following campaign:
@@ -77,8 +82,9 @@ This is the FINAL email (breakup email). Focus on:
 - Final compelling reason to connect
 - Clear but no-pressure call-to-action
 - Leave door open for future
+- END the email body with the call-to-action question or statement - NO closing salutation
 
-Use {{first_name}} and {{company}} placeholders appropriately."""
+{placeholder_instructions}"""
 
 # Template for rewriting an existing email
 REWRITE_EMAIL_PROMPT = """Rewrite the following email while maintaining its core message:
@@ -94,8 +100,40 @@ Campaign Context:
 - Tone: {tone}
 - Step Number: {step_number}
 
-Maintain the same placeholders ({{first_name}}, {{company}}) in appropriate places.
+IMPORTANT: Do NOT add any closing salutation or sign-off (like "Best,", "Regards,", etc.) at the end. The email should end with the call-to-action.
+
+{placeholder_instructions}
 Follow the rewrite instructions while keeping the email professional and effective."""
+
+# Template for generating email signature
+SIGNATURE_GENERATION_SYSTEM_PROMPT = """You are an expert at creating professional email signatures in HTML format.
+Your signatures should:
+- Be clean, professional, and modern
+- Use simple HTML with inline styles for maximum email client compatibility
+- Include all provided information in a clear hierarchy
+- Be compact but readable
+- Not include images, logos, or external resources
+- Use professional fonts and colors (blues, grays)
+- Be responsive and work in all email clients"""
+
+SIGNATURE_GENERATION_PROMPT = """Create a professional HTML email signature with the following information:
+
+Full Name: {full_name}
+Job Title: {job_title}
+Company Name: {company_name}
+Email: {email}
+
+Requirements:
+- Use a clean, modern layout with proper spacing
+- Name should be prominent (bold, slightly larger)
+- Job title and company on separate lines
+- Email as a clickable mailto: link
+- Use professional color scheme (navy/gray tones)
+- Keep it compact (3-4 lines total)
+- Use inline CSS only, no external stylesheets
+- Ensure compatibility with Gmail, Outlook, Apple Mail
+
+Return ONLY the HTML code, no explanations or markdown formatting."""
 
 # Tone descriptions for LLM context
 TONE_DESCRIPTIONS = {

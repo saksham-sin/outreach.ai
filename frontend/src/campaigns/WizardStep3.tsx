@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWizard } from './CampaignWizardContext';
 import { templatesApi, campaignsApi } from '../api';
-import { Button, TextArea, Input, Modal, Select } from '../components';
+import { Button, TextArea, Input, Modal, Select, EmailPreviewModal } from '../components';
 import { EmailTone } from '../types';
 import type { EmailTemplate } from '../types';
 import toast from 'react-hot-toast';
@@ -36,6 +36,11 @@ export function WizardStep3() {
     index: number;
     instructions: string;
   }>({ open: false, index: -1, instructions: '' });
+  const [previewModal, setPreviewModal] = useState<{
+    open: boolean;
+    templateId: string;
+    stepNumber: number;
+  }>({ open: false, templateId: '', stepNumber: 1 });
   
   // Refs for TextArea elements to track cursor position
   const textAreaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
@@ -395,20 +400,35 @@ export function WizardStep3() {
                 {templatesMode === 'ai' && (
                   <div className="flex gap-2">
                     {template && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          setRewriteModal({
-                            open: true,
-                            index: templateIndex,
-                            instructions: '',
-                          })
-                        }
-                        disabled={isRewriting === templateIndex}
-                      >
-                        Rewrite
-                      </Button>
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setPreviewModal({
+                              open: true,
+                              templateId: template.id,
+                              stepNumber,
+                            })
+                          }
+                        >
+                          👁️ Preview
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setRewriteModal({
+                              open: true,
+                              index: templateIndex,
+                              instructions: '',
+                            })
+                          }
+                          disabled={isRewriting === templateIndex}
+                        >
+                          Rewrite
+                        </Button>
+                      </>
                     )}
                     <Button
                       variant="secondary"
@@ -531,6 +551,17 @@ export function WizardStep3() {
           Next: Schedule
         </Button>
       </div>
+
+      {/* Preview Modal */}
+      {state.campaignId && (
+        <EmailPreviewModal
+          isOpen={previewModal.open}
+          onClose={() => setPreviewModal({ open: false, templateId: '', stepNumber: 1 })}
+          campaignId={state.campaignId}
+          templateId={previewModal.templateId}
+          stepNumber={previewModal.stepNumber}
+        />
+      )}
 
       {/* Rewrite Modal */}
       <Modal

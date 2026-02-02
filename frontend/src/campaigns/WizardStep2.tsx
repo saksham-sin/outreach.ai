@@ -19,6 +19,8 @@ export function WizardStep2() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [manualLead, setManualLead] = useState({ email: '', first_name: '', company: '' });
+  const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+  const [newLead, setNewLead] = useState({ email: '', first_name: '', company: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch existing campaigns for copy option
@@ -92,7 +94,8 @@ export function WizardStep2() {
 
     try {
       const parsedLeads = await parseCSV(file);
-      setLeads(parsedLeads);
+      // Append to existing leads instead of replacing
+      setLeads([...state.leads, ...parsedLeads]);
 
       const validCount = parsedLeads.filter((l) => l.isValid).length;
       const invalidCount = parsedLeads.length - validCount;
@@ -105,7 +108,7 @@ export function WizardStep2() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to parse CSV');
       setCsvFile(null);
-      setLeads([]);
+      // Don't clear all leads, just don't add new ones
     }
   };
 
@@ -212,21 +215,24 @@ export function WizardStep2() {
   };
 
   const handleAddLeadToPreview = () => {
-    const email = prompt('Enter email address:');
-    if (!email) return;
-
-    const firstName = prompt('Enter first name (optional):') || '';
-    const company = prompt('Enter company (optional):') || '';
+    const { email, first_name, company } = newLead;
+    
+    if (!email.trim()) {
+      toast.error('Email is required');
+      return;
+    }
 
     const lead: ParsedLead = {
       email: email.trim(),
-      first_name: firstName.trim() || undefined,
+      first_name: first_name.trim() || undefined,
       company: company.trim() || undefined,
       isValid: EMAIL_REGEX.test(email.trim()),
       error: EMAIL_REGEX.test(email.trim()) ? undefined : 'Invalid email format',
     };
 
     setLeads([...state.leads, lead]);
+    setNewLead({ email: '', first_name: '', company: '' });
+    setShowAddLeadModal(false);
     toast.success('Lead added to preview');
   };
 
@@ -415,7 +421,7 @@ export function WizardStep2() {
             </span>
             {importMethod === 'csv' && (
               <button
-                onClick={handleAddLeadToPreview}
+                onClick={() => setShowAddLeadModal(true)}
                 className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -500,6 +506,72 @@ export function WizardStep2() {
           Next: Email Templates
         </Button>
       </div>
+
+      {/* Add Lead Modal */}
+      {showAddLeadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Lead to Preview</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={newLead.email}
+                  onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
+                  placeholder="john@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={newLead.first_name}
+                  onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })}
+                  placeholder="John"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Company
+                </label>
+                <input
+                  type="text"
+                  value={newLead.company}
+                  onChange={(e) => setNewLead({ ...newLead, company: e.target.value })}
+                  placeholder="Acme Inc"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowAddLeadModal(false);
+                  setNewLead({ email: '', first_name: '', company: '' });
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddLeadToPreview}>
+                Add Lead
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

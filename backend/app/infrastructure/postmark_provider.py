@@ -45,11 +45,15 @@ class PostmarkProvider(EmailProvider):
             "X-Postmark-Server-Token": self.server_token,
         }
 
-    def _get_reply_to_address(self, lead_id: UUID) -> str:
+    def _get_reply_to_address(self, lead_id: UUID) -> Optional[str]:
         """
         Generate a reply-to address with MailboxHash for reply detection.
+        Returns None if inbound address is not configured.
         Format: reply+{lead_id}@domain.com
         """
+        if not self.inbound_address or "@" not in self.inbound_address:
+            # Inbound address not configured - skip reply-to setup
+            return None
         local_part, domain = self.inbound_address.split("@")
         return f"{local_part}+{lead_id}@{domain}"
 
@@ -62,6 +66,7 @@ class PostmarkProvider(EmailProvider):
         metadata: Optional[EmailMetadata] = None,
         track_opens: bool = True,
         track_links: bool = True,
+        from_email: Optional[str] = None,
     ) -> EmailResult:
         """
         Send a campaign email via Postmark.
@@ -74,12 +79,16 @@ class PostmarkProvider(EmailProvider):
             metadata: Campaign/lead tracking metadata
             track_opens: Whether to track email opens
             track_links: Whether to track link clicks
+            from_email: Optional custom from email (defaults to self.from_email)
             
         Returns:
             EmailResult with success status and message ID
         """
+        # Use custom from_email if provided, otherwise use configured default
+        email_address = from_email or self.from_email
+        
         payload = {
-            "From": f"{self.from_name} <{self.from_email}>",
+            "From": f"{self.from_name} <{email_address}>",
             "To": to_email,
             "Subject": subject,
             "HtmlBody": html_body,
@@ -92,9 +101,11 @@ class PostmarkProvider(EmailProvider):
         if text_body:
             payload["TextBody"] = text_body
 
-        # Add reply-to with MailboxHash for reply detection
+        # Add reply-to with MailboxHash for reply detection (if configured)
         if metadata and metadata.lead_id:
-            payload["ReplyTo"] = self._get_reply_to_address(metadata.lead_id)
+            reply_to = self._get_reply_to_address(metadata.lead_id)
+            if reply_to:
+                payload["ReplyTo"] = reply_to
 
         # Add metadata for tracking
         postmark_metadata = {}

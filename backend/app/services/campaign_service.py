@@ -76,7 +76,6 @@ class CampaignService:
             .where(Campaign.id == campaign_id, Campaign.user_id == user_id)
             .options(
                 selectinload(Campaign.templates),
-                selectinload(Campaign.leads),
             )
         )
         return result.scalar_one_or_none()
@@ -380,6 +379,7 @@ class CampaignService:
                 step_number=template.step_number,
                 subject=template.subject,
                 body=template.body,
+                delay_minutes=template.delay_minutes,
                 delay_days=template.delay_days,
             )
             self.session.add(new_template)

@@ -18,6 +18,8 @@ from app.core.prompts import (
     REWRITE_EMAIL_PROMPT,
     TONE_DESCRIPTIONS,
     DEFAULT_TONE,
+    SIGNATURE_GENERATION_SYSTEM_PROMPT,
+    SIGNATURE_GENERATION_PROMPT,
 )
 from app.domain.enums import EmailTone
 
@@ -44,6 +46,14 @@ class EnhancedPitch(BaseModel):
     )
 
 
+class GeneratedSignature(BaseModel):
+    """Structured output schema for AI-generated email signatures."""
+
+    signature_html: str = Field(
+        description="Professional HTML email signature with inline styles"
+    )
+
+
 class LLMClient:
     """Client for AI email generation using LangChain and OpenAI."""
 
@@ -55,6 +65,7 @@ class LLMClient:
         )
         self.structured_llm = self.llm.with_structured_output(GeneratedEmail)
         self.pitch_llm = self.llm.with_structured_output(EnhancedPitch)
+        self.signature_llm = self.llm.with_structured_output(GeneratedSignature)
 
     def _get_step_prompt(self, step_number: int) -> str:
         """Get the appropriate prompt template for a step number."""
@@ -76,6 +87,7 @@ class LLMClient:
         step_number: int,
         tone: EmailTone = EmailTone.PROFESSIONAL,
         previous_subject: Optional[str] = None,
+        has_company: Optional[bool] = None,
     ) -> GeneratedEmail:
         """
         Generate an email template for a campaign step.
@@ -86,6 +98,7 @@ class LLMClient:
             step_number: Step number (1-3)
             tone: Email tone
             previous_subject: Subject of previous email (for follow-ups)
+            has_company: Whether leads have company data (True=all have, False=none have, None=mixed)
             
         Returns:
             GeneratedEmail with subject and body
@@ -93,12 +106,25 @@ class LLMClient:
         prompt_template = self._get_step_prompt(step_number)
         tone_description = self._get_tone_description(tone)
         
+        # Build placeholder instructions based on company data
+        placeholder_instructions = ""
+        if has_company is False:
+            # No leads have company - don't use company placeholder
+            placeholder_instructions = "Use {{first_name}} placeholder only. Do NOT use {{company}} placeholder since leads don't have company data."
+        elif has_company is True:
+            # All leads have company - use both placeholders
+            placeholder_instructions = "Use {{first_name}} and {{company}} placeholders appropriately."
+        else:
+            # Mixed or unknown - default to both
+            placeholder_instructions = "Use {{first_name}} placeholder only. Do NOT use {{company}} placeholder since leads don't have company data."
+        
         # Format the prompt with campaign details
         user_prompt = prompt_template.format(
             campaign_name=campaign_name,
             pitch=pitch,
             tone=f"{tone.value} - {tone_description}",
             previous_subject=previous_subject or "N/A",
+            placeholder_instructions=placeholder_instructions,
         )
         
         messages = [
@@ -123,6 +149,7 @@ class LLMClient:
         pitch: str,
         step_number: int,
         tone: EmailTone = EmailTone.PROFESSIONAL,
+        has_company: Optional[bool] = None,
     ) -> GeneratedEmail:
         """
         Rewrite an existing email template based on instructions.
@@ -135,11 +162,24 @@ class LLMClient:
             pitch: Value proposition / campaign pitch
             step_number: Step number (1-3)
             tone: Email tone
+            has_company: Whether leads have company data
             
         Returns:
             GeneratedEmail with rewritten subject and body
         """
         tone_description = self._get_tone_description(tone)
+        
+        # Build placeholder instructions based on company data
+        placeholder_instructions = ""
+        if has_company is False:
+            # No leads have company - don't use company placeholder
+            placeholder_instructions = "Use {{first_name}} placeholder only. Do NOT use {{company}} placeholder since leads don't have company data."
+        elif has_company is True:
+            # All leads have company - use both placeholders
+            placeholder_instructions = "Use {{first_name}} and {{company}} placeholders appropriately."
+        else:
+            # Mixed or unknown - default to both
+            placeholder_instructions = "Use {{first_name}} and {{company}} placeholders appropriately."
         
         user_prompt = REWRITE_EMAIL_PROMPT.format(
             current_subject=current_subject,
@@ -149,6 +189,7 @@ class LLMClient:
             pitch=pitch,
             tone=f"{tone.value} - {tone_description}",
             step_number=step_number,
+            placeholder_instructions=placeholder_instructions,
         )
         
         messages = [
@@ -195,6 +236,45 @@ class LLMClient:
             return result.pitch.strip()
         except Exception as e:
             logger.error(f"Error enhancing pitch: {str(e)}")
+            raise
+
+    async def generate_signature(
+        self,
+        full_name: str,
+        job_title: str,
+        company_name: str,
+        email: str,
+    ) -> str:
+        """
+        Generate a professional HTML email signature.
+
+        Args:
+            full_name: User's full name
+            job_title: User's job title
+            company_name: User's company name
+            email: User's email address
+
+        Returns:
+            HTML email signature with inline styles
+        """
+        user_prompt = SIGNATURE_GENERATION_PROMPT.format(
+            full_name=full_name,
+            job_title=job_title,
+            company_name=company_name,
+            email=email,
+        )
+
+        messages = [
+            SystemMessage(content=SIGNATURE_GENERATION_SYSTEM_PROMPT),
+            HumanMessage(content=user_prompt),
+        ]
+
+        try:
+            result: GeneratedSignature = await self.signature_llm.ainvoke(messages)
+            logger.info(f"Generated email signature for {full_name}")
+            return result.signature_html.strip()
+        except Exception as e:
+            logger.error(f"Error generating signature: {str(e)}")
             raise
 
 

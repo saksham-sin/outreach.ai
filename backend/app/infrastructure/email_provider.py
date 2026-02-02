@@ -35,6 +35,7 @@ class EmailProvider(ABC):
         metadata: Optional[EmailMetadata] = None,
         track_opens: bool = True,
         track_links: bool = True,
+        from_email: Optional[str] = None,
     ) -> EmailResult:
         """
         Send a campaign email with tracking and reply detection.
@@ -47,6 +48,7 @@ class EmailProvider(ABC):
             metadata: Campaign/lead tracking metadata
             track_opens: Whether to track email opens
             track_links: Whether to track link clicks
+            from_email: Optional custom from email (defaults to configured EMAIL_FROM_ADDRESS)
             
         Returns:
             EmailResult with success status and message ID
