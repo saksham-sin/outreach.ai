@@ -212,7 +212,7 @@ export function ProfilePage() {
               onChange={(e) => setFormData({ ...formData, email_signature: e.target.value })}
               rows={6}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-              placeholder="<div>Your HTML signature here</div>"
+              placeholder="Your HTML signature here"
             />
             
             {/* Preview */}

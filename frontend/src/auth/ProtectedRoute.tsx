@@ -4,10 +4,11 @@ import { Spinner } from '../components';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  requireProfileComplete?: boolean;
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+export function ProtectedRoute({ children, requireProfileComplete = true }: ProtectedRouteProps) {
+  const { isAuthenticated, user, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -21,6 +22,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!isAuthenticated) {
     // Redirect to login, preserving the intended destination
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // If profile completion is required and user hasn't completed their profile
+  if (requireProfileComplete && user && !user.profile_completed && location.pathname !== '/complete-profile') {
+    return <Navigate to="/complete-profile" replace />;
   }
 
   return <>{children}</>;
