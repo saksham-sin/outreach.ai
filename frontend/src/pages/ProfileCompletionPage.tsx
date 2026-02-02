@@ -5,7 +5,7 @@ import { authApi, type UserProfileUpdate } from '../api/authApi';
 import { toast } from 'react-hot-toast';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
-import { TextArea } from '../components/TextArea';
+import { RichTextEditor } from '../components/RichTextEditor';
 
 export function ProfileCompletionPage() {
   const navigate = useNavigate();
@@ -147,14 +147,13 @@ export function ProfileCompletionPage() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Signature *</h2>
               <p className="text-sm text-gray-600 mb-3">
-                Your email signature will be added to all outreach emails
+                Your email signature will be added to all outreach emails. Click below to compose it.
               </p>
               
-              <TextArea
+              <RichTextEditor
                 value={formData.email_signature}
-                onChange={(e) => setFormData({ ...formData, email_signature: e.target.value })}
-                placeholder="Write your signature or click 'Generate' to create one automatically"
-                rows={6}
+                onChange={(value) => setFormData({ ...formData, email_signature: value })}
+                height="250px"
               />
 
               <button

@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { authApi, type UserProfileUpdate } from '../api/authApi';
 import { toast } from 'react-hot-toast';
+import { RichTextEditor, VariableHighlightPreview } from '../components';
 
 export function ProfilePage() {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [signatureEditMode, setSignatureEditMode] = useState(false);
   const [formData, setFormData] = useState<UserProfileUpdate>({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
@@ -182,23 +184,36 @@ export function ProfilePage() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Email Signature</h2>
-              <button
-                type="button"
-                onClick={handleGenerateSignature}
-                disabled={!isProfileComplete || isGenerating}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                {isGenerating ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    ✨ Generate with AI
-                  </>
-                )}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSignatureEditMode(!signatureEditMode)}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    signatureEditMode
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      : 'bg-gray-200 text-gray-900 hover:bg-gray-300'
+                  }`}
+                >
+                  {signatureEditMode ? '✓ Done Editing' : '✎ Edit'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateSignature}
+                  disabled={!isProfileComplete || isGenerating}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {isGenerating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      ✨ Generate with AI
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             <p className="text-sm text-gray-600 mb-3">
               {!isProfileComplete ? (
@@ -207,37 +222,41 @@ export function ProfilePage() {
                 'Your signature will be automatically added to all outbound emails'
               )}
             </p>
-            <textarea
-              value={formData.email_signature}
-              onChange={(e) => setFormData({ ...formData, email_signature: e.target.value })}
-              rows={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-              placeholder="Your HTML signature here"
-            />
-            
-            {/* Preview */}
-            {formData.email_signature && (
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Preview
-                </label>
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <div dangerouslySetInnerHTML={{ __html: formData.email_signature }} />
+
+            {signatureEditMode ? (
+              <div>
+                <RichTextEditor
+                  value={formData.email_signature}
+                  onChange={(value) => setFormData({ ...formData, email_signature: value })}
+                  height="300px"
+                />
+                
+                {/* Save Signature Button */}
+                <div className="flex justify-end mt-6 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={handleSaveSignature}
+                    disabled={isLoading || !formData.email_signature}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isLoading ? 'Saving...' : 'Save Signature'}
+                  </button>
                 </div>
               </div>
+            ) : (
+              <div>
+                {/* Preview Only */}
+                {formData.email_signature ? (
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div dangerouslySetInnerHTML={{ __html: formData.email_signature }} />
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <p className="text-gray-500">No signature yet. Click "Edit" to add one.</p>
+                  </div>
+                )}
+              </div>
             )}
-            
-            {/* Save Signature Button */}
-            <div className="flex justify-end mt-6 pt-4 border-t">
-              <button
-                type="button"
-                onClick={handleSaveSignature}
-                disabled={isLoading || !formData.email_signature}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? 'Saving...' : 'Save Signature'}
-              </button>
-            </div>
           </div>
         </div>
       </div>
