@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from app.api.dependencies import SessionDep, CurrentUser
 from app.services.template_service import TemplateService, TemplateError
 from app.models.email_template import (
+    EmailTemplate,
     EmailTemplateCreate,
     EmailTemplateUpdate,
     EmailTemplateRead,
@@ -49,6 +50,25 @@ class PreviewResponse(BaseModel):
     lead_company: str
 
 
+def _to_template_read(template: EmailTemplate) -> EmailTemplateRead:
+    delay_minutes = (
+        template.delay_minutes
+        if template.delay_minutes > 0
+        else template.delay_days * 1440
+    )
+    return EmailTemplateRead(
+        id=template.id,
+        campaign_id=template.campaign_id,
+        step_number=template.step_number,
+        subject=template.subject,
+        body=template.body,
+        delay_days=delay_minutes // 1440,
+        delay_minutes=delay_minutes,
+        created_at=template.created_at,
+        updated_at=template.updated_at,
+    )
+
+
 @router.post(
     "",
     response_model=EmailTemplateRead,
@@ -72,16 +92,7 @@ async def create_template(
     try:
         template = await service.create_template(campaign_id, current_user.id, data)
         
-        return EmailTemplateRead(
-            id=template.id,
-            campaign_id=template.campaign_id,
-            step_number=template.step_number,
-            subject=template.subject,
-            body=template.body,
-            delay_days=template.delay_days,
-            created_at=template.created_at,
-            updated_at=template.updated_at,
-        )
+        return _to_template_read(template)
     except TemplateError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -107,19 +118,7 @@ async def list_templates(
         templates = await service.list_templates(campaign_id, current_user.id)
         
         return TemplateListResponse(
-            templates=[
-                EmailTemplateRead(
-                    id=t.id,
-                    campaign_id=t.campaign_id,
-                    step_number=t.step_number,
-                    subject=t.subject,
-                    body=t.body,
-                    delay_days=t.delay_days,
-                    created_at=t.created_at,
-                    updated_at=t.updated_at,
-                )
-                for t in templates
-            ]
+            templates=[_to_template_read(t) for t in templates]
         )
     except TemplateError as e:
         raise HTTPException(
@@ -150,16 +149,7 @@ async def get_template(
             detail="Template not found",
         )
     
-    return EmailTemplateRead(
-        id=template.id,
-        campaign_id=template.campaign_id,
-        step_number=template.step_number,
-        subject=template.subject,
-        body=template.body,
-        delay_days=template.delay_days,
-        created_at=template.created_at,
-        updated_at=template.updated_at,
-    )
+    return _to_template_read(template)
 
 
 @router.patch(
@@ -191,16 +181,7 @@ async def update_template(
                 detail="Template not found",
             )
         
-        return EmailTemplateRead(
-            id=template.id,
-            campaign_id=template.campaign_id,
-            step_number=template.step_number,
-            subject=template.subject,
-            body=template.body,
-            delay_days=template.delay_days,
-            created_at=template.created_at,
-            updated_at=template.updated_at,
-        )
+        return _to_template_read(template)
     except TemplateError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -233,16 +214,7 @@ async def generate_template(
             campaign_id, current_user.id, request.step_number
         )
         
-        return EmailTemplateRead(
-            id=template.id,
-            campaign_id=template.campaign_id,
-            step_number=template.step_number,
-            subject=template.subject,
-            body=template.body,
-            delay_days=template.delay_days,
-            created_at=template.created_at,
-            updated_at=template.updated_at,
-        )
+        return _to_template_read(template)
     except TemplateError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -275,19 +247,7 @@ async def generate_all_templates(
         )
         
         return TemplateListResponse(
-            templates=[
-                EmailTemplateRead(
-                    id=t.id,
-                    campaign_id=t.campaign_id,
-                    step_number=t.step_number,
-                    subject=t.subject,
-                    body=t.body,
-                    delay_days=t.delay_days,
-                    created_at=t.created_at,
-                    updated_at=t.updated_at,
-                )
-                for t in templates
-            ]
+            templates=[_to_template_read(t) for t in templates]
         )
     except TemplateError as e:
         raise HTTPException(
@@ -327,16 +287,7 @@ async def rewrite_template(
                 detail="Template not found",
             )
         
-        return EmailTemplateRead(
-            id=template.id,
-            campaign_id=template.campaign_id,
-            step_number=template.step_number,
-            subject=template.subject,
-            body=template.body,
-            delay_days=template.delay_days,
-            created_at=template.created_at,
-            updated_at=template.updated_at,
-        )
+        return _to_template_read(template)
     except TemplateError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -413,7 +364,7 @@ async def preview_template(
     user = user_result.scalar_one_or_none()
     
     if user and user.email_signature:
-        body = f"{body}\n\n{user.email_signature}"
+        body = f"{body}<br><br>{user.email_signature}"
     
     return PreviewResponse(
         subject=subject,

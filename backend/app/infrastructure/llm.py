@@ -87,6 +87,7 @@ class LLMClient:
         step_number: int,
         tone: EmailTone = EmailTone.PROFESSIONAL,
         previous_subject: Optional[str] = None,
+        has_company: Optional[bool] = None,
     ) -> GeneratedEmail:
         """
         Generate an email template for a campaign step.
@@ -97,6 +98,7 @@ class LLMClient:
             step_number: Step number (1-3)
             tone: Email tone
             previous_subject: Subject of previous email (for follow-ups)
+            has_company: Whether leads have company data (True=all have, False=none have, None=mixed)
             
         Returns:
             GeneratedEmail with subject and body
@@ -104,12 +106,25 @@ class LLMClient:
         prompt_template = self._get_step_prompt(step_number)
         tone_description = self._get_tone_description(tone)
         
+        # Build placeholder instructions based on company data
+        placeholder_instructions = ""
+        if has_company is False:
+            # No leads have company - don't use company placeholder
+            placeholder_instructions = "Use {{first_name}} placeholder only. Do NOT use {{company}} placeholder since leads don't have company data."
+        elif has_company is True:
+            # All leads have company - use both placeholders
+            placeholder_instructions = "Use {{first_name}} and {{company}} placeholders appropriately."
+        else:
+            # Mixed or unknown - default to both
+            placeholder_instructions = "Use {{first_name}} placeholder only. Do NOT use {{company}} placeholder since leads don't have company data."
+        
         # Format the prompt with campaign details
         user_prompt = prompt_template.format(
             campaign_name=campaign_name,
             pitch=pitch,
             tone=f"{tone.value} - {tone_description}",
             previous_subject=previous_subject or "N/A",
+            placeholder_instructions=placeholder_instructions,
         )
         
         messages = [
@@ -134,6 +149,7 @@ class LLMClient:
         pitch: str,
         step_number: int,
         tone: EmailTone = EmailTone.PROFESSIONAL,
+        has_company: Optional[bool] = None,
     ) -> GeneratedEmail:
         """
         Rewrite an existing email template based on instructions.
@@ -146,11 +162,24 @@ class LLMClient:
             pitch: Value proposition / campaign pitch
             step_number: Step number (1-3)
             tone: Email tone
+            has_company: Whether leads have company data
             
         Returns:
             GeneratedEmail with rewritten subject and body
         """
         tone_description = self._get_tone_description(tone)
+        
+        # Build placeholder instructions based on company data
+        placeholder_instructions = ""
+        if has_company is False:
+            # No leads have company - don't use company placeholder
+            placeholder_instructions = "Use {{first_name}} placeholder only. Do NOT use {{company}} placeholder since leads don't have company data."
+        elif has_company is True:
+            # All leads have company - use both placeholders
+            placeholder_instructions = "Use {{first_name}} and {{company}} placeholders appropriately."
+        else:
+            # Mixed or unknown - default to both
+            placeholder_instructions = "Use {{first_name}} and {{company}} placeholders appropriately."
         
         user_prompt = REWRITE_EMAIL_PROMPT.format(
             current_subject=current_subject,
@@ -160,6 +189,7 @@ class LLMClient:
             pitch=pitch,
             tone=f"{tone.value} - {tone_description}",
             step_number=step_number,
+            placeholder_instructions=placeholder_instructions,
         )
         
         messages = [

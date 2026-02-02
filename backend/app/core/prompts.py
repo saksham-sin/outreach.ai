@@ -49,7 +49,7 @@ This is the FIRST email in the sequence. Focus on:
 - Soft call-to-action (e.g., "Worth a quick chat?")
 - END the email body with the call-to-action question or statement - NO closing salutation
 
-Use {{first_name}} and {{company}} placeholders appropriately."""
+{placeholder_instructions}"""
 
 # Template for generating follow-up email (Step 2)
 STEP_2_EMAIL_PROMPT = """Generate a follow-up email for the following campaign:
@@ -66,7 +66,7 @@ This is the SECOND email (follow-up). Focus on:
 - Slightly more direct call-to-action
 - END the email body with the call-to-action question or statement - NO closing salutation
 
-Use {{first_name}} and {{company}} placeholders appropriately."""
+{placeholder_instructions}"""
 
 # Template for generating final follow-up email (Step 3)
 STEP_3_EMAIL_PROMPT = """Generate a final follow-up email for the following campaign:
@@ -84,7 +84,7 @@ This is the FINAL email (breakup email). Focus on:
 - Leave door open for future
 - END the email body with the call-to-action question or statement - NO closing salutation
 
-Use {{first_name}} and {{company}} placeholders appropriately."""
+{placeholder_instructions}"""
 
 # Template for rewriting an existing email
 REWRITE_EMAIL_PROMPT = """Rewrite the following email while maintaining its core message:
@@ -102,7 +102,7 @@ Campaign Context:
 
 IMPORTANT: Do NOT add any closing salutation or sign-off (like "Best,", "Regards,", etc.) at the end. The email should end with the call-to-action.
 
-Maintain the same placeholders ({{first_name}}, {{company}}) in appropriate places.
+{placeholder_instructions}
 Follow the rewrite instructions while keeping the email professional and effective."""
 
 # Template for generating email signature

@@ -17,6 +17,7 @@ class EmailTemplateBase(SQLModel):
     subject: str = Field(max_length=200)
     body: str = Field(max_length=10000)  # HTML body
     delay_days: int = Field(default=0, ge=0)  # Days to wait before sending (for steps > 1)
+    delay_minutes: int = Field(default=0, ge=0)  # Minutes to wait before sending (for steps > 1)
 
     @staticmethod
     def convert_delay_to_seconds(value: int, unit: str) -> int:
@@ -97,7 +98,8 @@ class EmailTemplateCreate(SQLModel):
     step_number: int = Field(ge=1, le=3)
     subject: str
     body: str
-    delay_days: int = 0
+    delay_days: Optional[int] = None
+    delay_minutes: Optional[int] = None
 
 
 class EmailTemplateUpdate(SQLModel):
@@ -106,6 +108,7 @@ class EmailTemplateUpdate(SQLModel):
     subject: Optional[str] = None
     body: Optional[str] = None
     delay_days: Optional[int] = None
+    delay_minutes: Optional[int] = None
 
 
 class EmailTemplateRead(EmailTemplateBase):

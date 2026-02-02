@@ -33,6 +33,18 @@ class TemplateService:
         self.session = session
         self.llm = get_llm_client()
 
+    @staticmethod
+    def _resolve_delay_minutes(
+        delay_minutes: Optional[int],
+        delay_days: Optional[int],
+    ) -> int:
+        """Resolve delay in minutes from minutes or days input."""
+        if delay_minutes is not None:
+            return max(0, delay_minutes)
+        if delay_days is not None:
+            return max(0, delay_days * 1440)
+        return 0
+
     async def _get_campaign(
         self,
         campaign_id: UUID,
@@ -96,7 +108,13 @@ class TemplateService:
             step_number=data.step_number,
             subject=data.subject,
             body=data.body,
-            delay_days=data.delay_days,
+            delay_minutes=self._resolve_delay_minutes(
+                data.delay_minutes,
+                data.delay_days,
+            ),
+            delay_days=(
+                self._resolve_delay_minutes(data.delay_minutes, data.delay_days) // 1440
+            ),
         )
         self.session.add(template)
         await self.session.flush()
@@ -193,6 +211,13 @@ class TemplateService:
             )
         
         update_data = data.model_dump(exclude_unset=True)
+        if "delay_minutes" in update_data or "delay_days" in update_data:
+            resolved_minutes = self._resolve_delay_minutes(
+                update_data.get("delay_minutes"),
+                update_data.get("delay_days"),
+            )
+            update_data["delay_minutes"] = resolved_minutes
+            update_data["delay_days"] = resolved_minutes // 1440
         for field, value in update_data.items():
             setattr(template, field, value)
         
@@ -233,6 +258,27 @@ class TemplateService:
         if step_number > MAX_CAMPAIGN_STEPS:
             raise TemplateError(f"Maximum {MAX_CAMPAIGN_STEPS} steps allowed")
         
+        # Check if leads have company data
+        from app.models.lead import Lead
+        result = await self.session.execute(
+            select(Lead).where(Lead.campaign_id == campaign_id)
+        )
+        leads = list(result.scalars().all())
+        
+        # Determine if all leads have company or none have company
+        has_company = None
+        if leads:
+            leads_with_company = [l for l in leads if l.company and l.company.strip()]
+            if len(leads_with_company) == len(leads):
+                # All leads have company
+                has_company = True
+            elif len(leads_with_company) == 0:
+                # No leads have company
+                has_company = False
+            # If mixed, we'll default to True (include company placeholder)
+            else:
+                has_company = True
+        
         # Get previous step's subject for follow-up context
         previous_subject = None
         if step_number > 1:
@@ -249,6 +295,7 @@ class TemplateService:
             step_number=step_number,
             tone=campaign.tone,
             previous_subject=previous_subject,
+            has_company=has_company,
         )
         
         # Check if template exists for this step
@@ -272,6 +319,7 @@ class TemplateService:
                 step_number=step_number,
                 subject=generated.subject,
                 body=generated.body,
+                delay_minutes=DEFAULT_STEP_DELAYS.get(step_number, 3) * 1440,
                 delay_days=DEFAULT_STEP_DELAYS.get(step_number, 3),
             )
             self.session.add(template)
@@ -324,6 +372,27 @@ class TemplateService:
                 "Can only rewrite templates for campaigns in DRAFT status"
             )
         
+        # Check if leads have company data
+        from app.models.lead import Lead
+        result = await self.session.execute(
+            select(Lead).where(Lead.campaign_id == template.campaign_id)
+        )
+        leads = list(result.scalars().all())
+        
+        # Determine if all leads have company or none have company
+        has_company = None
+        if leads:
+            leads_with_company = [l for l in leads if l.company and l.company.strip()]
+            if len(leads_with_company) == len(leads):
+                # All leads have company
+                has_company = True
+            elif len(leads_with_company) == 0:
+                # No leads have company
+                has_company = False
+            # If mixed, default to True
+            else:
+                has_company = True
+        
         # Rewrite using LLM
         generated: GeneratedEmail = await self.llm.rewrite_email(
             current_subject=template.subject,
@@ -333,6 +402,7 @@ class TemplateService:
             pitch=campaign.pitch,
             step_number=template.step_number,
             tone=campaign.tone,
+            has_company=has_company,
         )
         
         # Update template

@@ -45,11 +45,15 @@ class PostmarkProvider(EmailProvider):
             "X-Postmark-Server-Token": self.server_token,
         }
 
-    def _get_reply_to_address(self, lead_id: UUID) -> str:
+    def _get_reply_to_address(self, lead_id: UUID) -> Optional[str]:
         """
         Generate a reply-to address with MailboxHash for reply detection.
+        Returns None if inbound address is not configured.
         Format: reply+{lead_id}@domain.com
         """
+        if not self.inbound_address or "@" not in self.inbound_address:
+            # Inbound address not configured - skip reply-to setup
+            return None
         local_part, domain = self.inbound_address.split("@")
         return f"{local_part}+{lead_id}@{domain}"
 
@@ -97,9 +101,11 @@ class PostmarkProvider(EmailProvider):
         if text_body:
             payload["TextBody"] = text_body
 
-        # Add reply-to with MailboxHash for reply detection
+        # Add reply-to with MailboxHash for reply detection (if configured)
         if metadata and metadata.lead_id:
-            payload["ReplyTo"] = self._get_reply_to_address(metadata.lead_id)
+            reply_to = self._get_reply_to_address(metadata.lead_id)
+            if reply_to:
+                payload["ReplyTo"] = reply_to
 
         # Add metadata for tracking
         postmark_metadata = {}

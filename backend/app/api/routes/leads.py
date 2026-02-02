@@ -91,9 +91,30 @@ async def list_leads(
     
     Supports filtering by status and pagination.
     """
+    from sqlalchemy import func, select
+    from app.models.campaign import Campaign
+    from app.models.lead import Lead
+    
     service = LeadService(session)
     
     try:
+        # Verify campaign ownership
+        campaign_result = await session.execute(
+            select(Campaign)
+            .where(Campaign.id == campaign_id, Campaign.user_id == current_user.id)
+        )
+        if not campaign_result.scalar_one_or_none():
+            raise LeadError("Campaign not found")
+        
+        # Get total count
+        count_query = select(func.count(Lead.id)).where(Lead.campaign_id == campaign_id)
+        if status_filter:
+            count_query = count_query.where(Lead.status == status_filter)
+        
+        total_result = await session.execute(count_query)
+        total_count = total_result.scalar() or 0
+        
+        # Get paginated leads
         leads = await service.list_leads(
             campaign_id, current_user.id, status_filter, skip, limit
         )
@@ -112,7 +133,7 @@ async def list_leads(
                 )
                 for l in leads
             ],
-            total=len(leads),
+            total=total_count,
         )
     except LeadError as e:
         raise HTTPException(
@@ -241,6 +262,33 @@ class MarkRepliedResponse(BaseModel):
     """Response after marking a lead as replied."""
     success: bool
     message: str
+
+
+@router.delete(
+    "/{lead_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a lead",
+    description="Delete a lead from a campaign. Only works for draft campaigns.",
+)
+async def delete_lead(
+    campaign_id: UUID,
+    lead_id: UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> None:
+    """
+    Delete a lead from a campaign.
+    
+    Only works when campaign is in draft status.
+    """
+    service = LeadService(session)
+    success = await service.delete_lead(lead_id, current_user.id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lead not found or cannot be deleted",
+        )
 
 
 @router.post(

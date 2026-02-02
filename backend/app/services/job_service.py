@@ -82,11 +82,14 @@ class JobService:
         """
         Get jobs that are ready to execute.
         
+        Uses FOR UPDATE SKIP LOCKED to ensure atomicity and prevent duplicate sends
+        if multiple workers are running concurrently. Only one worker can lock each job.
+        
         Args:
             limit: Maximum number of jobs to return
             
         Returns:
-            List of pending jobs with scheduled_at <= now
+            List of pending jobs with scheduled_at <= now, locked by this worker
         """
         now = datetime.now(timezone.utc)
         
@@ -98,6 +101,7 @@ class JobService:
             )
             .options(selectinload(EmailJob.lead))
             .order_by(EmailJob.scheduled_at)
+            .with_for_update(skip_locked=True)
             .limit(limit)
         )
         return list(result.scalars().all())
@@ -212,26 +216,41 @@ class JobService:
             if user:
                 if user.email_signature:
                     # Append signature with spacing
-                    body = f"{body}\n\n{user.email_signature}"
+                    body = f"{body}<br><br>{user.email_signature}"
                 
                 # Generate user-specific email from their first_name (with fallback)
                 if user.first_name:
                     user_email_address = get_user_email(user.first_name)
+        # Second validation right before send to catch reply/state changes
+        # (closes race between first validation and actual send)
+        is_valid_final, reason_final = await self._validate_job_for_execution(job)
+        if not is_valid_final:
+            job.status = JobStatus.SKIPPED
+            job.last_error = reason_final
+            job.updated_at = datetime.now(timezone.utc)
+            await self.session.flush()
+            logger.info(f"Job {job.id} skipped at final validation: {reason_final}")
+            return False
         
-        # Send email using the configured email provider
         metadata = EmailMetadata(
             campaign_id=job.campaign_id,
             lead_id=job.lead_id,
             step_number=job.step_number,
         )
         
-        result = await self.email_provider.send_email(
-            to_email=job.lead.email,
-            subject=subject,
-            html_body=body,
-            metadata=metadata,
-            from_email=user_email_address,  # Pass dynamic user email (or None for default)
-        )
+        # Send email with exception handling for provider failures
+        try:
+            result = await self.email_provider.send_email(
+                to_email=job.lead.email,
+                subject=subject,
+                html_body=body,
+                metadata=metadata,
+                from_email=user_email_address,  # Pass dynamic user email (or None for default)
+            )
+        except Exception as e:
+            # Catch any exceptions from provider (HTTP errors, timeout, etc.)
+            logger.error(f"Exception during send for job {job.id}: {str(e)}", exc_info=True)
+            return await self._handle_send_failure(job, f"Provider error: {str(e)}")
         
         if not result.success:
             return await self._handle_send_failure(job, result.error or "Unknown error")
@@ -336,7 +355,8 @@ class JobService:
             return None
         
         # Calculate scheduled time
-        scheduled_at = datetime.now(timezone.utc) + timedelta(days=template.delay_days)
+        delay_minutes = template.delay_minutes or (template.delay_days * 1440)
+        scheduled_at = datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)
         
         # Create next job
         next_job = EmailJob(
@@ -472,9 +492,11 @@ class JobService:
             List of failed email jobs
         """
         result = await self.session.execute(
-            select(EmailJob).where(
+            select(EmailJob)
+            .where(
                 EmailJob.campaign_id == campaign_id,
                 EmailJob.status == JobStatus.FAILED,
             )
+            .options(selectinload(EmailJob.lead))
         )
         return list(result.scalars().all())
