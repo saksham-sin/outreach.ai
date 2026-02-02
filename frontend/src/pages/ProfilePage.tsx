@@ -240,17 +240,6 @@ export function ProfilePage() {
             </div>
           </div>
         </div>
-
-        {/* Back to Dashboard Button */}
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
       </div>
     </div>
   );

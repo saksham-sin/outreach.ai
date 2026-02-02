@@ -1,0 +1,17 @@
+node_modules
+dist
+build
+.git
+.env
+.env.local
+.gitignore
+.dockerignore
+README.md
+.eslintrc
+.prettierrc
+.idea
+.vscode
+*.log
+.DS_Store
+.next
+out
