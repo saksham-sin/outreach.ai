@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
-import { authApi, type UserProfileUpdate } from '../api/authApi';
+import { authApi } from '../api/authApi';
 import { toast } from 'react-hot-toast';
 import { RichTextEditor } from '../components';
 
@@ -235,7 +235,7 @@ export function ProfilePage() {
             {signatureEditMode ? (
               <div>
                 <RichTextEditor
-                  value={formData.email_signature}
+                  value={formData.email_signature || ''}
                   onChange={(value) => setFormData({ ...formData, email_signature: value })}
                   height="300px"
                 />
