@@ -62,6 +62,7 @@ class PostmarkProvider(EmailProvider):
         metadata: Optional[EmailMetadata] = None,
         track_opens: bool = True,
         track_links: bool = True,
+        from_email: Optional[str] = None,
     ) -> EmailResult:
         """
         Send a campaign email via Postmark.
@@ -74,12 +75,16 @@ class PostmarkProvider(EmailProvider):
             metadata: Campaign/lead tracking metadata
             track_opens: Whether to track email opens
             track_links: Whether to track link clicks
+            from_email: Optional custom from email (defaults to self.from_email)
             
         Returns:
             EmailResult with success status and message ID
         """
+        # Use custom from_email if provided, otherwise use configured default
+        email_address = from_email or self.from_email
+        
         payload = {
-            "From": f"{self.from_name} <{self.from_email}>",
+            "From": f"{self.from_name} <{email_address}>",
             "To": to_email,
             "Subject": subject,
             "HtmlBody": html_body,

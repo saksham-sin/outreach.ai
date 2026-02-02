@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     
     # Resend (used when EMAIL_PROVIDER=resend)
     RESEND_API_KEY: str = ""
+    RESEND_FROM_DOMAIN: str = ""  # Custom domain for sending emails
     
     # Reply Mode
     REPLY_MODE: str = "webhook"  # "webhook" or "simulated"
@@ -59,3 +60,38 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
+
+
+def get_user_email(first_name: str) -> str:
+    """
+    Generate a user-specific email address using their first name.
+    
+    Args:
+        first_name: User's first name
+        
+    Returns:
+        User-specific email address in the format: {first_name}@{domain}
+        Falls back to default if first_name is empty or invalid
+    """
+    settings = get_settings()
+    
+    if not first_name or not first_name.strip():
+        # Return fallback email if no first_name provided
+        return settings.EMAIL_FROM_ADDRESS
+    
+    # Sanitize first_name: lowercase, remove non-alphanumeric chars except hyphens/underscores
+    clean_name = first_name.lower().strip()
+    clean_name = "".join(c if c.isalnum() or c in "-_" else "" for c in clean_name)
+    
+    if not clean_name:
+        # Return fallback if sanitization resulted in empty string
+        return settings.EMAIL_FROM_ADDRESS
+    
+    # Extract domain from configured email address
+    if "@" not in settings.EMAIL_FROM_ADDRESS:
+        return settings.EMAIL_FROM_ADDRESS
+    
+    domain = settings.EMAIL_FROM_ADDRESS.split("@")[1]
+    
+    # Return user-specific email
+    return f"{clean_name}@{domain}"

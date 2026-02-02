@@ -23,7 +23,7 @@ from app.core.constants import (
     MAX_CAMPAIGN_STEPS,
     TEMPLATE_PLACEHOLDERS,
 )
-from app.core.config import get_settings
+from app.core.config import get_settings, get_user_email
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -199,6 +199,9 @@ class JobService:
         )
         campaign = campaign_result.scalar_one_or_none()
         
+        # Default user-specific email (will use fallback if user has no first_name)
+        user_email_address = None
+        
         # Append user signature if available
         if campaign:
             user_result = await self.session.execute(
@@ -206,9 +209,14 @@ class JobService:
             )
             user = user_result.scalar_one_or_none()
             
-            if user and user.email_signature:
-                # Append signature with spacing
-                body = f"{body}\n\n{user.email_signature}"
+            if user:
+                if user.email_signature:
+                    # Append signature with spacing
+                    body = f"{body}\n\n{user.email_signature}"
+                
+                # Generate user-specific email from their first_name (with fallback)
+                if user.first_name:
+                    user_email_address = get_user_email(user.first_name)
         
         # Send email using the configured email provider
         metadata = EmailMetadata(
@@ -222,6 +230,7 @@ class JobService:
             subject=subject,
             html_body=body,
             metadata=metadata,
+            from_email=user_email_address,  # Pass dynamic user email (or None for default)
         )
         
         if not result.success:
