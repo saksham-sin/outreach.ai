@@ -8,10 +8,11 @@ Write-Host "   Outreach.AI Application Starter  " -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Get the script directory
+# Get the script directory and go up one level to project root
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
-$BACKEND_DIR = Join-Path $SCRIPT_DIR "backend"
-$FRONTEND_DIR = Join-Path $SCRIPT_DIR "frontend"
+$PROJECT_ROOT = Split-Path -Parent $SCRIPT_DIR
+$BACKEND_DIR = Join-Path $PROJECT_ROOT "backend"
+$FRONTEND_DIR = Join-Path $PROJECT_ROOT "frontend"
 
 # Check if backend directory exists
 if (-not (Test-Path $BACKEND_DIR)) {

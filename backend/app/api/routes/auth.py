@@ -110,6 +110,7 @@ async def get_current_user_info(
         company_name=current_user.company_name,
         job_title=current_user.job_title,
         email_signature=current_user.email_signature,
+        profile_completed=current_user.profile_completed,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at,
     )
@@ -144,6 +145,7 @@ async def update_profile(
         company_name=user.company_name,
         job_title=user.job_title,
         email_signature=user.email_signature,
+        profile_completed=user.profile_completed,
         created_at=user.created_at,
         updated_at=user.updated_at,
     )

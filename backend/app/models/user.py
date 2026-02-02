@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 from sqlmodel import SQLModel, Field
-from sqlalchemy import Column, DateTime, Text
+from sqlalchemy import Column, DateTime, Text, Boolean
 from uuid import UUID, uuid4
 
 
@@ -24,6 +24,7 @@ class User(UserBase, table=True):
     company_name: Optional[str] = Field(default=None, max_length=255)
     job_title: Optional[str] = Field(default=None, max_length=100)
     email_signature: Optional[str] = Field(default=None, sa_column=Column(Text))
+    profile_completed: bool = Field(default=False, index=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False)
@@ -49,6 +50,7 @@ class UserRead(UserBase):
     company_name: Optional[str] = None
     job_title: Optional[str] = None
     email_signature: Optional[str] = None
+    profile_completed: bool = False
     created_at: datetime
     updated_at: datetime
 
