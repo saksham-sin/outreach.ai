@@ -41,6 +41,7 @@ export interface User {
   job_title?: string;
   email_signature?: string;
   updated_at?: string;
+  profile_completed?: boolean;
 }
 
 // ===== Auth =====
