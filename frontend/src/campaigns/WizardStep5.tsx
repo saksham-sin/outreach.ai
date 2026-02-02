@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWizard } from './CampaignWizardContext';
-import { campaignsApi, leadsApi } from '../api';
-import { Button, ConfirmModal, Spinner } from '../components';
+import { campaignsApi, leadsApi, templatesApi } from '../api';
+import { Button, ConfirmModal, Spinner, Modal, VariableHighlightPreview } from '../components';
+import type { PreviewResponse } from '../types';
 import toast from 'react-hot-toast';
 
 export function WizardStep5() {
@@ -16,6 +17,31 @@ export function WizardStep5() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('09:00');
   const [scheduleError, setScheduleError] = useState('');
+  const [previewModal, setPreviewModal] = useState<{
+    open: boolean;
+    templateId: string;
+    stepNumber: number;
+  }>({ open: false, templateId: '', stepNumber: 1 });
+  const [previewData, setPreviewData] = useState<PreviewResponse | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  const getDelayMinutes = (delayMinutes: number, delayDays: number) => {
+    if (delayMinutes && delayMinutes > 0) return delayMinutes;
+    return delayDays * 1440;
+  };
+
+  const formatDelay = (totalMinutes: number) => {
+    if (totalMinutes <= 0) return 'Same time';
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+    const parts = [
+      days > 0 ? `${days}d` : '',
+      hours > 0 ? `${hours}h` : '',
+      minutes > 0 ? `${minutes}m` : '',
+    ].filter(Boolean);
+    return parts.join(' ');
+  };
 
   // Fetch actual lead count from server
   useEffect(() => {
@@ -51,6 +77,22 @@ export function WizardStep5() {
       setSendImmediately(false);
     }
   }, [state.startTime]);
+
+  const handleShowPreview = async (templateId: string, stepNumber: number) => {
+    if (!state.campaignId) return;
+
+    setPreviewModal({ open: true, templateId, stepNumber });
+    setIsLoadingPreview(true);
+
+    try {
+      const data = await templatesApi.preview(state.campaignId, templateId);
+      setPreviewData(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Failed to load preview');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
 
   const handleLaunch = async () => {
     if (!state.campaignId) return;
@@ -102,10 +144,10 @@ export function WizardStep5() {
   );
 
   // Calculate total campaign duration
-  const totalDays = sortedTemplates.reduce(
-    (sum, t, index) => (index === 0 ? 0 : sum + t.delay_days),
-    0
-  );
+  const totalMinutes = sortedTemplates.reduce((sum, t, index) => {
+    const delayMinutes = getDelayMinutes(t.delay_minutes, t.delay_days);
+    return index === 0 ? 0 : sum + delayMinutes;
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -152,20 +194,30 @@ export function WizardStep5() {
       <div className="border rounded-lg overflow-hidden">
         <div className="bg-gray-50 px-4 py-3 border-b">
           <h3 className="text-sm font-medium text-gray-700">
-            Email Sequence ({totalDays > 0 ? `${totalDays} days total` : 'Same day'})
+            Email Sequence ({totalMinutes > 0 ? `${formatDelay(totalMinutes)} total` : 'Same time'})
           </h3>
         </div>
         <div className="divide-y">
           {sortedTemplates.map((template, index) => {
             // Calculate when this email will be sent
-            let dayOffset = 0;
+            let minuteOffset = 0;
             for (let i = 0; i < index; i++) {
-              dayOffset += sortedTemplates[i]?.delay_days || 0;
+              minuteOffset += getDelayMinutes(
+                sortedTemplates[i]?.delay_minutes || 0,
+                sortedTemplates[i]?.delay_days || 0
+              );
             }
-            dayOffset += template.delay_days;
+            minuteOffset += getDelayMinutes(
+              template.delay_minutes,
+              template.delay_days
+            );
 
             return (
-              <div key={template.id} className="p-4">
+              <div
+                key={template.id}
+                className="p-4 cursor-pointer hover:bg-blue-50 transition"
+                onClick={() => handleShowPreview(template.id, template.step_number)}
+              >
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-medium">
@@ -176,7 +228,7 @@ export function WizardStep5() {
                     </span>
                   </div>
                   <span className="text-sm text-gray-500">
-                    {index === 0 ? 'Launch day' : `Day ${dayOffset}`}
+                    {index === 0 ? 'Launch time' : formatDelay(minuteOffset)}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 line-clamp-2 ml-8">
@@ -355,6 +407,51 @@ export function WizardStep5() {
           </Button>
         </div>
       </div>
+
+      {/* Email Preview Modal */}
+      <Modal
+        isOpen={previewModal.open}
+        onClose={() => setPreviewModal({ open: false, templateId: '', stepNumber: 1 })}
+        title={`Email ${previewModal.stepNumber} Preview`}
+        size="large"
+      >
+        <div className="space-y-4">
+          {isLoadingPreview ? (
+            <div className="flex items-center justify-center py-12">
+              <Spinner />
+            </div>
+          ) : previewData ? (
+            <>
+              {/* Preview Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  <strong>Preview for:</strong> {previewData.lead_name} from {previewData.lead_company} ({previewData.lead_email})
+                </p>
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Subject
+                </label>
+                <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                  <p className="text-gray-900">{previewData.subject}</p>
+                </div>
+              </div>
+
+              {/* Body with highlighted variables */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Body
+                </label>
+                <div className="bg-white p-4 rounded border border-gray-200 max-h-96 overflow-y-auto">
+                  <VariableHighlightPreview htmlContent={previewData.body} />
+                </div>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </Modal>
 
       {/* Launch Confirmation */}
       <ConfirmModal

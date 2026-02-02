@@ -5,6 +5,7 @@ import type {
   LeadCreate,
   LeadImportResult,
   CopyLeadsResponse,
+  EmailHistoryResponse,
   LeadStatus,
 } from '../types';
 
@@ -46,6 +47,13 @@ export const leadsApi = {
       data
     );
     return response.data;
+  },
+
+  /**
+   * Delete a lead
+   */
+  delete: async (campaignId: string, leadId: string): Promise<void> => {
+    await apiClient.delete(`/campaigns/${campaignId}/leads/${leadId}`);
   },
 
   /**
@@ -91,6 +99,19 @@ export const leadsApi = {
     const response = await apiClient.post<{ success: boolean; message: string }>(
       `/campaigns/${campaignId}/leads/${leadId}/mark-replied`,
       {}
+    );
+    return response.data;
+  },
+
+  /**
+   * Get email send history for a lead
+   */
+  getEmailHistory: async (
+    campaignId: string,
+    leadId: string
+  ): Promise<EmailHistoryResponse> => {
+    const response = await apiClient.get<EmailHistoryResponse>(
+      `/campaigns/${campaignId}/leads/${leadId}/email-history`
     );
     return response.data;
   },

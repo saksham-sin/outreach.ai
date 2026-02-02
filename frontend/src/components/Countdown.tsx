@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface CountdownProps {
-  targetTime: string; // ISO datetime string
-  onComplete?: () => void;
+  readonly targetTime: string; // ISO datetime string
+  readonly onComplete?: () => void;
 }
 
 export function Countdown({ targetTime, onComplete }: CountdownProps) {
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [isCompleted, setIsCompleted] = useState(false);
+  const hasCompletedRef = useRef(false);
 
   useEffect(() => {
     const updateCountdown = () => {
@@ -16,9 +17,12 @@ export function Countdown({ targetTime, onComplete }: CountdownProps) {
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setTimeRemaining('Now');
+        setTimeRemaining('Sent');
         setIsCompleted(true);
-        onComplete?.();
+        if (!hasCompletedRef.current) {
+          hasCompletedRef.current = true;
+          onComplete?.();
+        }
         return;
       }
 
@@ -42,14 +46,20 @@ export function Countdown({ targetTime, onComplete }: CountdownProps) {
       setIsCompleted(false);
     };
 
+    hasCompletedRef.current = false;
     updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
+    const interval = setInterval(() => {
+      updateCountdown();
+      if (hasCompletedRef.current) {
+        clearInterval(interval);
+      }
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [targetTime, onComplete]);
 
   return (
-    <span className={`font-medium ${isCompleted ? 'text-green-600' : 'text-gray-900'}`}>
+    <span className={`font-medium tabular-nums ${isCompleted ? 'text-green-600' : 'text-gray-900'}`}>
       {timeRemaining || '...'}
     </span>
   );

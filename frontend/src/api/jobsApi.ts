@@ -5,6 +5,23 @@ interface FailedJobInfo {
   lead_id: string;
 }
 
+interface StepSummary {
+  step_number: number;
+  sent: number;
+  pending: number;
+  failed: number;
+  skipped: number;
+  next_scheduled_at: string | null;
+}
+
+interface LeadJobInfo {
+  job_id: string;
+  step_number: number;
+  status: string;
+  scheduled_at: string | null;
+  sent_at: string | null;
+}
+
 export const jobsApi = {
   /**
    * Retry a single failed job
@@ -37,6 +54,27 @@ export const jobsApi = {
     );
     return response.data;
   },
+
+  /**
+   * Get step-by-step job status summary for a campaign
+   */
+  getStepSummary: async (campaignId: string): Promise<StepSummary[]> => {
+    const response = await apiClient.get<StepSummary[]>(
+      `/jobs/campaigns/${campaignId}/step-summary`
+    );
+    return response.data;
+  },
+
+  /**
+   * Get all jobs for a specific lead
+   */
+  getJobsForLead: async (leadId: string): Promise<LeadJobInfo[]> => {
+    const response = await apiClient.get<LeadJobInfo[]>(
+      `/jobs/leads/${leadId}/jobs`
+    );
+    return response.data;
+  },
 };
 
+export type { StepSummary, LeadJobInfo };
 export default jobsApi;

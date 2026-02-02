@@ -97,6 +97,14 @@ uvicorn app.main:app --reload
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
+### 6. Run the Background Worker
+
+The worker must run in a separate process to send scheduled emails:
+
+```bash
+python -m app.services.worker
+```
+
 The API will be available at `http://localhost:8000`
 
 - API docs: `http://localhost:8000/docs`

@@ -135,6 +135,7 @@ export interface EmailTemplate {
   subject: string;
   body: string;
   delay_days: number;
+  delay_minutes: number;
   created_at: string;
   updated_at: string;
 }
@@ -156,12 +157,14 @@ export interface EmailTemplateCreate {
   subject: string;
   body: string;
   delay_days?: number;
+  delay_minutes?: number;
 }
 
 export interface EmailTemplateUpdate {
   subject?: string;
   body?: string;
   delay_days?: number;
+  delay_minutes?: number;
 }
 
 export interface GenerateTemplateRequest {
@@ -191,6 +194,24 @@ export interface EmailJob {
   postmark_message_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ===== Email History =====
+
+export interface EmailSendEvent {
+  step_number: number;
+  status: string;
+  scheduled_at: string;
+  sent_at: string | null;
+  subject: string;
+  attempts: number;
+  last_error: string | null;
+}
+
+export interface EmailHistoryResponse {
+  lead_id: string;
+  email: string;
+  events: EmailSendEvent[];
 }
 
 // ===== CSV Parsing =====

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { campaignsApi, leadsApi, jobsApi, templatesApi } from '../api';
+import type { StepSummary, LeadJobInfo } from '../api/jobsApi';
 import { useInterval } from '../hooks';
 import {
   Button,
@@ -10,6 +11,7 @@ import {
   Modal,
   ConfirmModal,
   EmptyState,
+  EmailPreviewModal,
 } from '../components';
 import { CampaignStatus, LeadStatus } from '../types';
 import type { CampaignWithStats, Lead, EmailTemplate } from '../types';
@@ -33,23 +35,48 @@ export function CampaignDetailPage() {
   const [retryingAll, setRetryingAll] = useState(false);
   const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
   const [leadJobs, setLeadJobs] = useState<Record<string, any>>({});
+  const [stepSummaries, setStepSummaries] = useState<StepSummary[]>([]);
+  const [now, setNow] = useState(Date.now());
   const [showMarkRepliedConfirm, setShowMarkRepliedConfirm] = useState(false);
   const [isMarkingReplied, setIsMarkingReplied] = useState(false);
+  const [previewModal, setPreviewModal] = useState({ open: false, templateId: '', stepNumber: 1 });
+  const [selectedLeadJobs, setSelectedLeadJobs] = useState<LeadJobInfo[]>([]);
+  const [isLoadingLeadJobs, setIsLoadingLeadJobs] = useState(false);
   const enableSimulatedReply = import.meta.env.VITE_ENABLE_SIMULATED_REPLY === 'true';
+
+  const getDelayMinutes = (delayMinutes: number, delayDays: number) => {
+    if (delayMinutes && delayMinutes > 0) return delayMinutes;
+    return delayDays * 1440;
+  };
+
+  const formatDelay = (totalMinutes: number) => {
+    if (totalMinutes <= 0) return 'Same time';
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+    const parts = [
+      days > 0 ? `${days}d` : '',
+      hours > 0 ? `${hours}h` : '',
+      minutes > 0 ? `${minutes}m` : '',
+    ].filter(Boolean);
+    return parts.join(' ');
+  };
 
   const fetchData = useCallback(async () => {
     if (!id) return;
 
     try {
-      const [campaignData, leadsData, failedJobs, templatesData] = await Promise.all([
+      const [campaignData, leadsData, failedJobs, templatesData, stepSummaryData] = await Promise.all([
         campaignsApi.get(id),
         leadsApi.list(id, { limit: 500 }),
         jobsApi.getFailedJobs(id),
         templatesApi.list(id),
+        jobsApi.getStepSummary(id),
       ]);
       setCampaign(campaignData);
       setLeads(leadsData.leads);
       setTemplates(templatesData.templates);
+      setStepSummaries(stepSummaryData);
       
       // Build mapping of lead_id -> job_id for failed jobs
       const jobMapping: Record<string, string> = {};
@@ -68,6 +95,29 @@ export function CampaignDetailPage() {
     fetchData();
   }, [fetchData]);
 
+  // Fetch jobs when a lead is selected
+  useEffect(() => {
+    if (selectedLead && id) {
+      setIsLoadingLeadJobs(true);
+      leadsApi.getEmailHistory(id, selectedLead.id)
+        .then((history) => {
+          // Transform email history to LeadJobInfo format for compatibility
+          const jobs = history.events.map((event) => ({
+            job_id: `${selectedLead.id}-step${event.step_number}`,
+            step_number: event.step_number,
+            status: event.status,
+            scheduled_at: event.scheduled_at,
+            sent_at: event.sent_at,
+          }));
+          setSelectedLeadJobs(jobs);
+        })
+        .catch(() => setSelectedLeadJobs([]))
+        .finally(() => setIsLoadingLeadJobs(false));
+    } else {
+      setSelectedLeadJobs([]);
+    }
+  }, [selectedLead?.id, id]);
+
   // Auto-poll for active campaigns
   useInterval(
     () => {
@@ -77,6 +127,42 @@ export function CampaignDetailPage() {
     },
     campaign?.status === CampaignStatus.ACTIVE ? POLL_INTERVAL : null
   );
+
+  // Tick countdown timers
+  useInterval(
+    () => {
+      setNow(Date.now());
+    },
+    campaign ? 1000 : null
+  );
+
+  const sortedTemplates = useMemo(
+    () => [...templates].sort((a, b) => a.step_number - b.step_number),
+    [templates]
+  );
+
+  // Helper to get step summary by step number
+  const getStepSummary = useCallback(
+    (stepNumber: number): StepSummary | undefined =>
+      stepSummaries.find((s) => s.step_number === stepNumber),
+    [stepSummaries]
+  );
+
+  const formatCountdown = (msRemaining: number) => {
+    if (msRemaining <= 0) return 'Sent';
+    const totalSeconds = Math.floor(msRemaining / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const parts = [
+      days > 0 ? `${days}d` : '',
+      hours > 0 ? `${hours}h` : '',
+      minutes > 0 ? `${minutes}m` : '',
+      days === 0 && hours === 0 ? `${seconds}s` : '',
+    ].filter(Boolean);
+    return parts.join(' ');
+  };
 
   const handlePause = async () => {
     if (!id) return;
@@ -294,12 +380,53 @@ export function CampaignDetailPage() {
         </div>
 
         {/* Email Sequence Preview */}
-        {templates.length > 0 && (
+        {sortedTemplates.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Sequence</h2>
             <div className="space-y-4">
-              {templates.map((template) => (
-                <div key={template.id} className="flex items-start gap-4 pb-4 border-b last:border-b-0 last:pb-0">
+              {sortedTemplates.map((template) => {
+                const waitMinutes = getDelayMinutes(template.delay_minutes, template.delay_days);
+                const stepSummary = getStepSummary(template.step_number);
+                
+                // Determine step status based on actual job data
+                const hasSentJobs = stepSummary && stepSummary.sent > 0;
+                const hasPendingJobs = stepSummary && stepSummary.pending > 0;
+                const nextScheduledAt = stepSummary?.next_scheduled_at;
+                
+                // Show timer if: active campaign, has pending jobs, and has scheduled time
+                const showNextTimer =
+                  campaign &&
+                  campaign.status === CampaignStatus.ACTIVE &&
+                  hasPendingJobs &&
+                  nextScheduledAt;
+                
+                // Calculate countdown from actual scheduled time
+                const targetTime = nextScheduledAt ? new Date(nextScheduledAt).getTime() : null;
+                const countdown = targetTime ? formatCountdown(targetTime - now) : null;
+                
+                // Determine badge to show
+                let statusBadge = null;
+                if (hasSentJobs && !hasPendingJobs) {
+                  // All jobs sent
+                  statusBadge = (
+                    <span className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
+                      ✓ Sent
+                    </span>
+                  );
+                } else if (showNextTimer && countdown) {
+                  statusBadge = (
+                    <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
+                      ⏱ {countdown}
+                    </span>
+                  );
+                }
+
+                return (
+                <div
+                  key={template.id}
+                  onClick={() => setPreviewModal({ open: true, templateId: template.id, stepNumber: template.step_number })}
+                  className="flex items-start gap-4 pb-4 border-b last:border-b-0 last:pb-0 cursor-pointer hover:bg-gray-50 p-2 -m-2 rounded transition"
+                >
                   <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                     <span className="text-sm font-semibold text-blue-700">{template.step_number}</span>
                   </div>
@@ -308,18 +435,22 @@ export function CampaignDetailPage() {
                       <h3 className="text-sm font-medium text-gray-900 truncate">
                         {template.subject}
                       </h3>
-                      {template.delay_days > 0 && (
+                      {waitMinutes > 0 && (
                         <span className="text-xs text-gray-500">
-                          (Wait {template.delay_days} {template.delay_days === 1 ? 'day' : 'days'})
+                          (Wait {formatDelay(
+                            waitMinutes
+                          )})
                         </span>
                       )}
+                      {statusBadge}
                     </div>
                     <p className="text-xs text-gray-500 line-clamp-2">
                       {template.body.replace(/<[^>]*>/g, '').substring(0, 150)}...
                     </p>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -430,6 +561,103 @@ export function CampaignDetailPage() {
                 <StatusBadge status={selectedLead.status} />
               </div>
             </div>
+
+            {/* Email Transaction Timeline */}
+            <div>
+              <label className="text-sm font-medium text-gray-500">Email Timeline</label>
+              {isLoadingLeadJobs ? (
+                <div className="mt-3 flex justify-center">
+                  <Spinner size="sm" />
+                </div>
+              ) : (
+              <div className="mt-3 relative pl-8 border-l border-gray-200 space-y-4">
+                {sortedTemplates.map((template) => {
+                  // Find the job for this step
+                  const job = selectedLeadJobs.find((j) => j.step_number === template.step_number);
+                  
+                  let statusText = 'Not scheduled';
+                  let statusColor = 'text-gray-500';
+                  let dotColor = 'bg-gray-300';
+                  let subText: string | null = null;
+
+                  if (job) {
+                    switch (job.status) {
+                      case 'sent':
+                        statusText = 'Sent';
+                        statusColor = 'text-green-600';
+                        dotColor = 'bg-green-500';
+                        if (job.sent_at) {
+                          subText = new Date(job.sent_at).toLocaleString();
+                        }
+                        break;
+                      case 'pending':
+                        statusText = 'Scheduled';
+                        statusColor = 'text-blue-600';
+                        dotColor = 'bg-blue-500';
+                        if (job.scheduled_at) {
+                          const scheduledDate = new Date(job.scheduled_at);
+                          const isPast = scheduledDate.getTime() <= Date.now();
+                          if (isPast) {
+                            statusText = 'Sending soon...';
+                            statusColor = 'text-yellow-600';
+                            dotColor = 'bg-yellow-500';
+                          } else {
+                            subText = scheduledDate.toLocaleString();
+                          }
+                        }
+                        break;
+                      case 'failed':
+                        statusText = 'Failed';
+                        statusColor = 'text-red-600';
+                        dotColor = 'bg-red-500';
+                        break;
+                      case 'skipped':
+                        statusText = 'Skipped';
+                        statusColor = 'text-gray-500';
+                        dotColor = 'bg-gray-400';
+                        if (selectedLead.status === LeadStatus.REPLIED) {
+                          subText = 'Lead replied';
+                        }
+                        break;
+                    }
+                  }
+
+                  return (
+                    <div key={template.id} className="relative">
+                      <span className={`absolute -left-[14px] top-1.5 w-3 h-3 rounded-full ${dotColor}`} />
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            Email {template.step_number}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate max-w-[260px]">
+                            {template.subject}
+                          </p>
+                          {subText && (
+                            <p className="text-xs text-gray-400 mt-0.5">{subText}</p>
+                          )}
+                        </div>
+                        <span className={`text-xs font-medium ${statusColor} whitespace-nowrap`}>{statusText}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {selectedLead.status === LeadStatus.REPLIED && (
+                  <div className="relative">
+                    <span className="absolute -left-[14px] top-1.5 w-3 h-3 rounded-full bg-green-500" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Reply received</p>
+                        <p className="text-xs text-green-600">Follow-ups canceled</p>
+                      </div>
+                      <span className="text-xs font-medium text-green-600">Replied</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              )}
+            </div>
             {selectedLead.status === LeadStatus.REPLIED && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-sm font-medium text-green-800">
@@ -487,6 +715,17 @@ export function CampaignDetailPage() {
         confirmText="Mark as Replied"
         isLoading={isMarkingReplied}
       />
+
+      {/* Email Preview Modal */}
+      {campaign && (
+        <EmailPreviewModal
+          isOpen={previewModal.open}
+          onClose={() => setPreviewModal({ open: false, templateId: '', stepNumber: 1 })}
+          campaignId={campaign.id}
+          templateId={previewModal.templateId}
+          stepNumber={previewModal.stepNumber}
+        />
+      )}
     </div>
   );
 }

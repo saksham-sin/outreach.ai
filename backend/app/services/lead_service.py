@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from app.models.lead import Lead, LeadCreate, LeadRead, LeadImportResult
 from app.models.campaign import Campaign
+from app.services.campaign_service import CampaignService
 from app.models.email_job import EmailJob
 from app.domain.enums import CampaignStatus, LeadStatus, JobStatus
 from app.core.constants import (
@@ -385,6 +386,7 @@ class LeadService:
         """
         Mark a lead as replied (terminal state).
         Called when an inbound reply is detected.
+        Also cancels all pending jobs for this lead.
         
         Args:
             lead_id: Lead to mark
@@ -404,9 +406,31 @@ class LeadService:
         if not lead.status.is_terminal():
             lead.status = LeadStatus.REPLIED
             lead.updated_at = datetime.now(timezone.utc)
-            await self.session.flush()
             
-            logger.info(f"Lead marked as replied: {lead_id}")
+            # Cancel all pending jobs for this lead
+            pending_jobs_result = await self.session.execute(
+                select(EmailJob).where(
+                    EmailJob.lead_id == lead_id,
+                    EmailJob.status == JobStatus.PENDING,
+                )
+            )
+            pending_jobs = pending_jobs_result.scalars().all()
+            
+            for job in pending_jobs:
+                job.status = JobStatus.SKIPPED
+                job.last_error = "Lead replied - job canceled"
+                job.updated_at = datetime.now(timezone.utc)
+            
+            await self.session.flush()
+
+            # Check if campaign can be completed now
+            try:
+                campaign_service = CampaignService(self.session)
+                await campaign_service.check_campaign_completion(lead.campaign_id)
+            except Exception:
+                logger.exception(f"Failed to check campaign completion after reply for lead {lead_id}")
+
+            logger.info(f"Lead marked as replied: {lead_id}, canceled {len(pending_jobs)} pending jobs")
         
         return lead
 

@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWizard } from './CampaignWizardContext';
 import { templatesApi, campaignsApi } from '../api';
-import { Button, TextArea, Input, Modal, Select, EmailPreviewModal } from '../components';
+import { Button, TextArea, Input, Modal, Select, EmailPreviewModal, RichTextEditor, VariableHighlightPreview } from '../components';
 import { EmailTone } from '../types';
 import type { EmailTemplate } from '../types';
 import toast from 'react-hot-toast';
-
-const MAX_STEPS = 3;
 
 const TONE_OPTIONS = [
   { value: EmailTone.PROFESSIONAL, label: 'Professional' },
@@ -18,13 +16,13 @@ const TONE_OPTIONS = [
 
 export function WizardStep3() {
   const { state, setTemplates, updateTemplate, setTone, nextStep, prevStep } = useWizard();
-  const [templatesMode, setTemplatesMode] = useState<'manual' | 'ai'>('manual');
+  const [templatesMode, setTemplatesMode] = useState<'manual' | 'ai'>('ai');
   const [isGenerating, setIsGenerating] = useState<number | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isRewriting, setIsRewriting] = useState<number | null>(null);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState<number | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
-  const maxFollowups = parseInt(import.meta.env.VITE_MAX_FOLLOWUPS || '3', 10);
+  const maxFollowups = Number.parseInt(import.meta.env.VITE_MAX_FOLLOWUPS || '3', 10);
   const [visibleSteps, setVisibleSteps] = useState<number[]>([1]); // Start with Email 1 only
   const [drafts, setDrafts] = useState<Record<number, { subject: string; body: string }>>({
     1: { subject: '', body: '' },
@@ -41,6 +39,13 @@ export function WizardStep3() {
     templateId: string;
     stepNumber: number;
   }>({ open: false, templateId: '', stepNumber: 1 });
+  const [draftPreviewModal, setDraftPreviewModal] = useState<{
+    open: boolean;
+    subject: string;
+    body: string;
+    stepNumber: number;
+  }>({ open: false, subject: '', body: '', stepNumber: 1 });
+  const [stepViewMode, setStepViewMode] = useState<Record<number, 'edit' | 'preview'>>({});
   
   // Refs for TextArea elements to track cursor position
   const textAreaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
@@ -55,7 +60,7 @@ export function WizardStep3() {
         if (response.templates.length > 0) {
           setTemplates(response.templates);
           // Set visible steps based on existing templates
-          const steps = response.templates.map((t) => t.step_number).sort();
+          const steps = response.templates.map((t) => t.step_number).sort((a, b) => a - b);
           setVisibleSteps(steps);
         }
       } catch {
@@ -207,10 +212,12 @@ export function WizardStep3() {
     setIsGeneratingAll(true);
 
     try {
-      const response = await templatesApi.generateAll(state.campaignId, MAX_STEPS);
+      // Only generate for visible steps
+      const numSteps = visibleSteps.length;
+      const response = await templatesApi.generateAll(state.campaignId, numSteps);
       setTemplates(response.templates);
       setAiError(null);
-      toast.success('Generated all email templates');
+      toast.success(`Generated ${numSteps} email template${numSteps > 1 ? 's' : ''}`);
     } catch {
       setAiError(
         'AI generation is temporarily unavailable. You can continue by writing emails manually.'
@@ -262,23 +269,17 @@ export function WizardStep3() {
     }
   };
 
-  const handleUpdateBody = async (index: number, body: string) => {
-    const template = state.templates[index];
-    if (!template || !state.campaignId) return;
-
-    // Only update if the value actually changed
-    if (template.body === body) return;
-
-    try {
-      await templatesApi.update(state.campaignId, template.id, { body });
-      updateTemplate(index, { body });
-    } catch {
-      // Silently fail, will retry on next change
-    }
-  };
-
   const getTemplateForStep = (stepNumber: number): EmailTemplate | undefined => {
     return state.templates.find((t) => t.step_number === stepNumber);
+  };
+
+  const handleRemoveFollowup = (stepNumber: number) => {
+    // Remove the template from visible steps
+    setVisibleSteps(visibleSteps.filter((s) => s !== stepNumber));
+    // Remove from state templates
+    const filtered = state.templates.filter((t) => t.step_number !== stepNumber);
+    setTemplates(filtered);
+    toast.success(`Removed follow-up email ${stepNumber}`);
   };
 
   const handleNext = async () => {
@@ -377,6 +378,7 @@ export function WizardStep3() {
           const draft = getDraft(stepNumber);
           const subjectValue = template?.subject ?? draft.subject;
           const bodyValue = template?.body ?? draft.body;
+          const viewMode = stepViewMode[stepNumber] ?? 'preview';
 
           return (
             <div
@@ -384,66 +386,105 @@ export function WizardStep3() {
               className="border rounded-lg p-4 space-y-4"
             >
               <div className="flex justify-between items-center">
-                <h3 className="font-medium text-gray-900">
-                  Email {stepNumber}
-                  {stepNumber === 1 && (
-                    <span className="text-gray-500 font-normal ml-2">
-                      (Initial outreach)
-                    </span>
-                  )}
-                  {stepNumber > 1 && (
-                    <span className="text-gray-500 font-normal ml-2">
-                      (Follow-up)
-                    </span>
-                  )}
-                </h3>
-                {templatesMode === 'ai' && (
-                  <div className="flex gap-2">
-                    {template && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setPreviewModal({
-                              open: true,
-                              templateId: template.id,
-                              stepNumber,
-                            })
-                          }
-                        >
-                          👁️ Preview
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setRewriteModal({
-                              open: true,
-                              index: templateIndex,
-                              instructions: '',
-                            })
-                          }
-                          disabled={isRewriting === templateIndex}
-                        >
-                          Rewrite
-                        </Button>
-                      </>
+                <div>
+                  <h3 className="font-medium text-gray-900">
+                    Email {stepNumber}
+                    {stepNumber === 1 && (
+                      <span className="text-gray-500 font-normal ml-2">
+                        (Initial outreach)
+                      </span>
                     )}
+                    {stepNumber > 1 && (
+                      <span className="text-gray-500 font-normal ml-2">
+                        (Follow-up)
+                      </span>
+                    )}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  {stepNumber > 1 && (
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
-                      onClick={() => handleGenerateSingle(stepNumber)}
-                      isLoading={isGenerating === stepNumber}
-                      disabled={isGeneratingAll || (isGenerating !== null && isGenerating !== stepNumber)}
+                      onClick={() => handleRemoveFollowup(stepNumber)}
+                      className="text-red-600 hover:text-red-700"
                     >
-                      {template ? 'Regenerate' : 'Generate'}
+                      Remove
                     </Button>
-                  </div>
-                )}
+                  )}
+                  {templatesMode === 'ai' && (
+                    <div className="flex gap-2">
+                      {template && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              if (!state.campaignId || !template) return;
+
+                              try {
+                                // Always persist current content before server preview
+                                await templatesApi.update(
+                                  state.campaignId,
+                                  template.id,
+                                  { subject: subjectValue, body: bodyValue }
+                                );
+                                updateTemplate(templateIndex, {
+                                  subject: subjectValue,
+                                  body: bodyValue,
+                                });
+                              } catch {
+                                // If save fails, show local draft preview
+                                setDraftPreviewModal({
+                                  open: true,
+                                  subject: subjectValue,
+                                  body: bodyValue,
+                                  stepNumber,
+                                });
+                                return;
+                              }
+
+                              setPreviewModal({
+                                open: true,
+                                templateId: template.id,
+                                stepNumber,
+                              });
+                            }}
+                          >
+                            👁️ Preview
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setRewriteModal({
+                                open: true,
+                                index: templateIndex,
+                                instructions: '',
+                              })
+                            }
+                            disabled={isRewriting === templateIndex}
+                          >
+                            Rewrite
+                          </Button>
+                        </>
+                      )}
+                      {!template && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleGenerateSingle(stepNumber)}
+                          isLoading={isGenerating === stepNumber}
+                          disabled={isGeneratingAll || (isGenerating !== null && isGenerating !== stepNumber)}
+                        >
+                          Generate
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <>
                 <Input
                   label="Subject"
                   value={subjectValue}
@@ -463,59 +504,87 @@ export function WizardStep3() {
                   placeholder="Email subject line"
                 />
                 <div className="space-y-2">
-                  <TextArea
-                    ref={(el) => {
-                      if (el) textAreaRefs.current[stepNumber] = el;
-                    }}
-                    label="Body"
-                    value={bodyValue}
-                    onChange={(e) => {
-                      updateDraft(stepNumber, 'body', e.target.value);
-                      if (template) {
-                        updateTemplate(templateIndex, { body: e.target.value });
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (template) {
-                        handleUpdateBody(templateIndex, e.target.value);
-                      } else {
-                        handleCreateTemplate(stepNumber, subjectValue, e.target.value);
-                      }
-                    }}
-                    placeholder="Email body content..."
-                    rows={6}
-                  />
-                  {templatesMode === 'manual' && (
-                    <div className="flex gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertPlaceholder(stepNumber, '{{first_name}}');
-                        }}
-                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition"
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Email Body</span>
+                    {viewMode === 'preview' ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          setStepViewMode((prev) => ({ ...prev, [stepNumber]: 'edit' }))
+                        }
                       >
-                        + {'{{first_name}}'}
-                      </button>
-                      <button
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertPlaceholder(stepNumber, '{{company}}');
-                        }}
-                        className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition"
+                        Edit
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          setStepViewMode((prev) => ({ ...prev, [stepNumber]: 'preview' }))
+                        }
                       >
-                        + {'{{company}}'}
-                      </button>
+                        Preview
+                      </Button>
+                    )}
+                  </div>
+
+                  {viewMode === 'preview' ? (
+                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      {bodyValue ? (
+                        <VariableHighlightPreview htmlContent={bodyValue} />
+                      ) : (
+                        <p className="text-gray-500">No content yet.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <RichTextEditor
+                        value={bodyValue}
+                        onChange={(value) => {
+                          updateDraft(stepNumber, 'body', value);
+                          if (template) {
+                            updateTemplate(templateIndex, { body: value });
+                          }
+                        }}
+                        height="300px"
+                      />
                     </div>
                   )}
-                  {templatesMode === 'manual' && (
+
+                  {viewMode === 'edit' && (
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            insertPlaceholder(stepNumber, '{{first_name}}');
+                          }}
+                          className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition"
+                        >
+                          + {'{{first_name}}'}
+                        </button>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            insertPlaceholder(stepNumber, '{{company}}');
+                          }}
+                          className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition"
+                        >
+                          + {'{{company}}'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {templatesMode === 'manual' && viewMode === 'edit' && (
                     <p className="text-xs text-gray-500">
                       Click the buttons above to insert placeholders, or type them manually: {'{{first_name}}'}, {'{{company}}'}.
                     </p>
                   )}
                 </div>
-              </>
             </div>
           );
         })}
@@ -562,6 +631,39 @@ export function WizardStep3() {
           stepNumber={previewModal.stepNumber}
         />
       )}
+
+      {/* Draft Preview Modal */}
+      <Modal
+        isOpen={draftPreviewModal.open}
+        onClose={() =>
+          setDraftPreviewModal({ open: false, subject: '', body: '', stepNumber: 1 })
+        }
+        title={`Email ${draftPreviewModal.stepNumber} Preview (Draft)`}
+        size="large"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Subject
+            </label>
+            <div className="bg-gray-50 p-3 rounded border border-gray-200">
+              <p className="text-gray-900">{draftPreviewModal.subject || '(No subject)'}</p>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Body
+            </label>
+            <div className="bg-white p-4 rounded border border-gray-200 max-h-96 overflow-y-auto">
+              {draftPreviewModal.body ? (
+                <VariableHighlightPreview htmlContent={draftPreviewModal.body} />
+              ) : (
+                <p className="text-gray-500">No content yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
 
       {/* Rewrite Modal */}
       <Modal

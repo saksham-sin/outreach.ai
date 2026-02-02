@@ -298,24 +298,34 @@ export function DashboardPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {campaign.status === 'active' && campaign.nextSendAt ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-700">
-                            <Countdown 
-                              targetTime={campaign.nextSendAt}
-                              onComplete={() => fetchCampaigns()}
-                            />
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowSendConfirm(campaign.id);
-                            }}
-                            className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition"
-                            disabled={sendingNowId === campaign.id}
-                          >
-                            {sendingNowId === campaign.id ? 'Sending...' : 'Send Now'}
-                          </button>
-                        </div>
+                        (() => {
+                          const isPast = new Date(campaign.nextSendAt as string).getTime() <= Date.now();
+                          if (isPast) {
+                            return (
+                              <span className="text-green-600 font-medium">Sent</span>
+                            );
+                          }
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-700 w-24">
+                                <Countdown 
+                                  targetTime={campaign.nextSendAt}
+                                  onComplete={() => fetchCampaigns()}
+                                />
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowSendConfirm(campaign.id);
+                                }}
+                                className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition"
+                                disabled={sendingNowId === campaign.id}
+                              >
+                                {sendingNowId === campaign.id ? 'Sending...' : 'Send Now'}
+                              </button>
+                            </div>
+                          );
+                        })()
                       ) : (
                         <span className="text-gray-400">-</span>
                       )}
