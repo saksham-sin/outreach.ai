@@ -1,7 +1,7 @@
 """add user profile and signature fields
 
 Revision ID: 7dba13c5edeb
-Revises: 004_add_delay_minutes
+Revises: 005_add_sent_at_index
 Create Date: 2026-02-02 01:49:53.332339
 
 """
@@ -13,7 +13,7 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = '7dba13c5edeb'
-down_revision: Union[str, None] = '004_add_delay_minutes'
+down_revision: Union[str, None] = '005_add_sent_at_index'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
