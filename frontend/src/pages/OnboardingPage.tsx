@@ -12,7 +12,7 @@ export function OnboardingPage() {
   const [isSavingSignature, setIsSavingSignature] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [signatureEditMode, setSignatureEditMode] = useState(false);
-  const [formData, setFormData] = useState<UserProfileUpdate>({
+  const [formData, setFormData] = useState<Record<string, string>>({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
     company_name: user?.company_name || '',
