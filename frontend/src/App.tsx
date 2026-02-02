@@ -1,7 +1,7 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, ProtectedRoute } from './auth';
-import { LoginPage, VerifyPage, DashboardPage, CampaignDetailPage, ProfilePage, ProfileCompletionPage } from './pages';
+import { LoginPage, VerifyPage, DashboardPage, CampaignDetailPage, ProfilePage, OnboardingPage } from './pages';
 import { CampaignWizard } from './campaigns';
 
 function App() {
@@ -55,10 +55,10 @@ function App() {
             }
           />
           <Route
-            path="/complete-profile"
+            path="/onboarding"
             element={
               <ProtectedRoute>
-                <ProfileCompletionPage />
+                <OnboardingPage />
               </ProtectedRoute>
             }
           />

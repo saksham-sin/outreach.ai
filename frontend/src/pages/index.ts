@@ -3,4 +3,4 @@ export { VerifyPage } from './VerifyPage';
 export { DashboardPage } from './DashboardPage';
 export { CampaignDetailPage } from './CampaignDetailPage';
 export { ProfilePage } from './ProfilePage';
-export { ProfileCompletionPage } from './ProfileCompletionPage';
+export { OnboardingPage } from './OnboardingPage';

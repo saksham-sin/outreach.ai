@@ -5,7 +5,7 @@ import { authApi, type UserProfileUpdate } from '../api/authApi';
 import { toast } from 'react-hot-toast';
 import { RichTextEditor } from '../components';
 
-export function ProfilePage() {
+export function OnboardingPage() {
   const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -79,7 +79,6 @@ export function ProfilePage() {
   };
 
   const handleGenerateSignature = async () => {
-    // Validate required fields
     if (!formData.first_name || !formData.last_name || !formData.job_title || !formData.company_name) {
       toast.error('Please fill in your name, job title, and company name first');
       return;
@@ -99,23 +98,19 @@ export function ProfilePage() {
   };
 
   const isProfileComplete = formData.first_name && formData.last_name && formData.job_title && formData.company_name;
+  const isOnboardingComplete = Boolean(user?.profile_completed);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
-          <button
-            onClick={() => navigate('/')}
-            className="text-gray-600 hover:text-gray-900 mb-4 flex items-center gap-2"
-          >
-            ← Back to Dashboard
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
-          <p className="text-gray-600 mt-2">Manage your account information and email signature</p>
+          <h1 className="text-3xl font-bold text-gray-900">Welcome,</h1>
+          <p className="text-gray-600 mt-2">
+            Please complete your profile and generate an email signature to get started
+          </p>
         </div>
 
         <div className="space-y-6">
-          {/* Basic Info Card */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -179,8 +174,7 @@ export function ProfilePage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
               />
             </div>
-            
-            {/* Save Profile Button */}
+
             <div className="flex justify-end mt-6 pt-4 border-t">
               <button
                 type="button"
@@ -193,7 +187,6 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {/* Email Signature Card */}
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Email Signature</h2>
@@ -239,8 +232,7 @@ export function ProfilePage() {
                   onChange={(value) => setFormData({ ...formData, email_signature: value })}
                   height="300px"
                 />
-                
-                {/* Save Signature Button */}
+
                 <div className="flex justify-end mt-6 pt-4 border-t">
                   <button
                     type="button"
@@ -254,7 +246,6 @@ export function ProfilePage() {
               </div>
             ) : (
               <div>
-                {/* Preview Only */}
                 {formData.email_signature ? (
                   <>
                     <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 mb-4">
@@ -279,12 +270,22 @@ export function ProfilePage() {
               </div>
             )}
           </div>
+
+          {isOnboardingComplete && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+              <p className="text-green-700 font-semibold mb-4">
+                Onboarding successfully completed
+              </p>
+              <button
+                onClick={() => navigate('/')}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-
-
-

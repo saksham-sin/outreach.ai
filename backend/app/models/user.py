@@ -50,7 +50,7 @@ class UserRead(UserBase):
     company_name: Optional[str] = None
     job_title: Optional[str] = None
     email_signature: Optional[str] = None
-    profile_completed: bool
+    profile_completed: bool = False
     created_at: datetime
     updated_at: datetime
 

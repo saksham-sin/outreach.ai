@@ -264,11 +264,12 @@ class AuthService:
         
         # Mark profile as complete if all required fields are filled
         if (user.first_name and user.last_name and 
-            user.company_name and user.email_signature):
+            user.company_name and user.job_title and user.email_signature):
             user.profile_completed = True
         
         user.updated_at = datetime.now(timezone.utc)
         await self.session.flush()
+        await self.session.refresh(user)
         
         logger.info(f"Updated profile for user: {user_id}")
         return user

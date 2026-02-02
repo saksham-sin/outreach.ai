@@ -25,8 +25,8 @@ export function ProtectedRoute({ children, requireProfileComplete = true }: Prot
   }
 
   // If profile completion is required and user hasn't completed their profile
-  if (requireProfileComplete && user && !user.profile_completed && location.pathname !== '/complete-profile') {
-    return <Navigate to="/complete-profile" replace />;
+  if (requireProfileComplete && user && !user.profile_completed && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return <>{children}</>;
