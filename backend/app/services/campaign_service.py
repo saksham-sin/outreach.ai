@@ -458,6 +458,8 @@ class CampaignService:
         """
         Get the next scheduled email send time and job ID.
         
+        Only returns jobs for leads that are not in terminal state.
+        
         Args:
             campaign_id: Campaign ID
             user_id: Owner's user ID
@@ -470,12 +472,15 @@ class CampaignService:
         if not campaign:
             return None
         
-        # Get earliest pending job
+        # Get earliest pending job for non-terminal leads
         result = await self.session.execute(
             select(EmailJob)
+            .join(Lead, EmailJob.lead_id == Lead.id)
             .where(
                 EmailJob.campaign_id == campaign_id,
                 EmailJob.status == JobStatus.PENDING,
+                # Exclude jobs for leads that are in terminal state
+                Lead.status.not_in([LeadStatus.REPLIED, LeadStatus.FAILED]),
             )
             .order_by(EmailJob.scheduled_at)
             .limit(1)
@@ -495,6 +500,7 @@ class CampaignService:
         """
         Trigger immediate send of the next pending email.
         Updates the earliest pending job's scheduled_at to now.
+        Only considers jobs for non-terminal leads.
         
         Args:
             campaign_id: Campaign ID
@@ -508,12 +514,14 @@ class CampaignService:
         if not campaign:
             raise CampaignError("Campaign not found")
         
-        # Get earliest pending job
+        # Get earliest pending job for non-terminal leads
         result = await self.session.execute(
             select(EmailJob)
+            .join(Lead, EmailJob.lead_id == Lead.id)
             .where(
                 EmailJob.campaign_id == campaign_id,
                 EmailJob.status == JobStatus.PENDING,
+                Lead.status.not_in([LeadStatus.REPLIED, LeadStatus.FAILED]),
             )
             .order_by(EmailJob.scheduled_at)
             .limit(1)

@@ -28,8 +28,13 @@ apiClient.interceptors.response.use(
   (error: AxiosError<{ detail?: string }>) => {
     const message = error.response?.data?.detail || error.message || 'An error occurred';
     
-    // Don't show toast for 401 errors (handled by auth context)
-    if (error.response?.status !== 401) {
+    if (error.response?.status === 401) {
+      // Clear token and redirect to login
+      localStorage.removeItem('auth_token');
+      if (typeof window !== 'undefined') {
+        window.location.hash = '#/login';
+      }
+    } else {
       toast.error(message);
     }
     

@@ -94,6 +94,7 @@ async def handle_inbound_email(
             message="Lead not found",
         )
     
+    await session.commit()
     logger.info(f"Lead {lead_id} marked as replied")
     
     return WebhookResponse(

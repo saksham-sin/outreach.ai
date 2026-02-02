@@ -17,7 +17,7 @@ const STEPS = [
   { number: 5, title: 'Review & Launch' },
 ];
 
-function WizardContent() {
+function WizardContentInner() {
   const { id } = useParams<{ id: string }>();
   const { currentStep, resetWizard, goToStep, setCampaignId, setName, setPitch, setTone, setTags, setTemplates, setLeads } = useWizard();
   const navigate = useNavigate();
@@ -201,12 +201,16 @@ function WizardContent() {
   );
 }
 
-export function CampaignWizard() {
+function WizardContent() {
   return (
     <CampaignWizardProvider>
-      <WizardContent />
+      <WizardContentInner />
     </CampaignWizardProvider>
   );
+}
+
+export function CampaignWizard() {
+  return <WizardContent />;
 }
 
 export default CampaignWizard;

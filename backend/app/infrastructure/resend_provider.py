@@ -40,7 +40,7 @@ class ResendProvider(EmailProvider):
         Generate a reply-to address for reply detection.
         Format: reply+{lead_id}@domain.com
         """
-        if not self.inbound_address:
+        if not self.inbound_address or "@" not in self.inbound_address:
             return None
         local_part, domain = self.inbound_address.split("@")
         return f"{local_part}+{lead_id}@{domain}"

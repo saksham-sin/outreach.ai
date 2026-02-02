@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Modal, Button, Spinner } from '../components';
-import { templatesApi, type PreviewResponse } from '../api';
+import { templatesApi } from '../api';
+import type { PreviewResponse } from '../types';
 import toast from 'react-hot-toast';
 
 interface EmailPreviewModalProps {
@@ -33,12 +34,13 @@ export function EmailPreviewModal({
     }
   };
 
-  // Load preview when modal opens
+  // Load preview when modal opens or template changes
   useEffect(() => {
-    if (isOpen && !preview) {
+    if (isOpen && templateId) {
+      setPreview(null);
       loadPreview();
     }
-  }, [isOpen]);
+  }, [isOpen, templateId, campaignId]);
 
   return (
     <Modal

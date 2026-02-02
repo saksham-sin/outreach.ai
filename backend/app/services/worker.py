@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+import signal
 
 from app.infrastructure.database import async_session_factory
 from app.services.job_service import JobService
@@ -106,3 +106,37 @@ def get_worker() -> EmailWorker:
     if _worker is None:
         _worker = EmailWorker()
     return _worker
+
+
+async def _run_worker() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+    worker = get_worker()
+
+    stop_event = asyncio.Event()
+
+    def _signal_handler() -> None:
+        logger.info("Shutdown signal received. Stopping worker...")
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, _signal_handler)
+        except NotImplementedError:
+            # Signal handlers may not be supported on some platforms
+            pass
+
+    await worker.start()
+    await stop_event.wait()
+    await worker.stop()
+
+
+def main() -> None:
+    asyncio.run(_run_worker())
+
+
+if __name__ == "__main__":
+    main()

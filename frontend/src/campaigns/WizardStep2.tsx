@@ -3,10 +3,12 @@ import Papa from 'papaparse';
 import { useWizard } from './CampaignWizardContext';
 import { campaignsApi, leadsApi } from '../api';
 import { Button } from '../components';
-import type { ParsedLead, Campaign } from '../types';
+import type { ParsedLead, Campaign, Lead } from '../types';
 import toast from 'react-hot-toast';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 type ImportMethod = 'csv' | 'copy' | 'manual';
 
@@ -21,6 +23,7 @@ export function WizardStep2() {
   const [manualLead, setManualLead] = useState({ email: '', first_name: '', company: '' });
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
   const [newLead, setNewLead] = useState({ email: '', first_name: '', company: '' });
+  const [savedLeads, setSavedLeads] = useState<Lead[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch existing campaigns for copy option
@@ -37,6 +40,34 @@ export function WizardStep2() {
       }
     };
     fetchCampaigns();
+  }, [state.campaignId]);
+
+  // Fetch saved leads from database and add to state.leads
+  useEffect(() => {
+    const fetchSavedLeads = async () => {
+      if (!state.campaignId) return;
+      
+      try {
+        const response = await leadsApi.list(state.campaignId, { limit: 100 });
+        setSavedLeads(response.leads);
+        
+        // Only initialize state.leads with saved leads if state.leads is empty
+        // This preserves any leads that were just added
+        if (state.leads.length === 0 && response.leads.length > 0) {
+          const savedAsLeads: ParsedLead[] = response.leads.map((lead) => ({
+            email: lead.email,
+            first_name: lead.first_name || undefined,
+            company: lead.company || undefined,
+            isValid: true,
+          }));
+          setLeads(savedAsLeads);
+        }
+      } catch (err) {
+        console.error('Failed to fetch saved leads:', err);
+      }
+    };
+
+    fetchSavedLeads();
   }, [state.campaignId]);
 
   const parseCSV = (file: File): Promise<ParsedLead[]> => {
@@ -94,7 +125,7 @@ export function WizardStep2() {
 
     try {
       const parsedLeads = await parseCSV(file);
-      // Append to existing leads instead of replacing
+      // Append new leads to existing leads (which includes saved ones from DB)
       setLeads([...state.leads, ...parsedLeads]);
 
       const validCount = parsedLeads.filter((l) => l.isValid).length;
@@ -108,12 +139,20 @@ export function WizardStep2() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to parse CSV');
       setCsvFile(null);
-      // Don't clear all leads, just don't add new ones
     }
   };
 
   const handleUploadAndContinue = async () => {
     if (!state.campaignId) return;
+
+    // Calculate how many leads are newly added (not yet saved)
+    const newLeadsCount = state.leads.length - savedLeads.length;
+
+    // If no new leads to upload, just proceed
+    if (newLeadsCount <= 0) {
+      nextStep();
+      return;
+    }
 
     // Only upload CSV if we're using CSV import method and have a file
     if (importMethod === 'csv' && csvFile) {
@@ -127,6 +166,47 @@ export function WizardStep2() {
           console.warn('Import errors:', result.errors);
         }
 
+        // Refresh saved leads after import
+        const response = await leadsApi.list(state.campaignId, { limit: 100 });
+        setSavedLeads(response.leads);
+
+        // Persist any preview-added leads that aren't in the CSV upload
+        const existingEmails = new Set(response.leads.map((l) => normalizeEmail(l.email)));
+        const pendingPreviewLeads = state.leads.filter(
+          (lead) => lead.isValid && !existingEmails.has(normalizeEmail(lead.email))
+        );
+
+        if (pendingPreviewLeads.length > 0) {
+          for (const lead of pendingPreviewLeads) {
+            try {
+              await leadsApi.create(state.campaignId, {
+                email: lead.email,
+                first_name: lead.first_name,
+                company: lead.company,
+              });
+            } catch (err) {
+              console.warn(`Failed to save lead ${lead.email}:`, err);
+            }
+          }
+
+          const refreshed = await leadsApi.list(state.campaignId, { limit: 100 });
+          setSavedLeads(refreshed.leads);
+          setLeads(refreshed.leads.map((lead) => ({
+            email: lead.email,
+            first_name: lead.first_name || undefined,
+            company: lead.company || undefined,
+            isValid: true,
+          })));
+        } else {
+          setLeads(response.leads.map((lead) => ({
+            email: lead.email,
+            first_name: lead.first_name || undefined,
+            company: lead.company || undefined,
+            isValid: true,
+          })));
+        }
+        
+        setCsvFile(null);
         nextStep();
       } catch {
         // Error handled by API client
@@ -134,14 +214,15 @@ export function WizardStep2() {
         setIsUploading(false);
       }
     } else if (importMethod === 'manual') {
-      // For manual method, save all valid leads to database
+      // For manual method, save all NEW valid leads to database
       setIsUploading(true);
 
       try {
-        const validLeads = state.leads.filter((l) => l.isValid);
+        // Only save the new leads (those not in savedLeads)
+        const newLeads = state.leads.slice(savedLeads.length).filter((l) => l.isValid);
         let savedCount = 0;
 
-        for (const lead of validLeads) {
+        for (const lead of newLeads) {
           try {
             await leadsApi.create(state.campaignId, {
               email: lead.email,
@@ -157,6 +238,16 @@ export function WizardStep2() {
         if (savedCount > 0) {
           toast.success(`Saved ${savedCount} lead${savedCount !== 1 ? 's' : ''}`);
         }
+        
+        // Refresh saved leads after saving
+        const response = await leadsApi.list(state.campaignId, { limit: 100 });
+        setSavedLeads(response.leads);
+        setLeads(response.leads.map((lead) => ({
+          email: lead.email,
+          first_name: lead.first_name || undefined,
+          company: lead.company || undefined,
+          isValid: true,
+        })));
         nextStep();
       } catch {
         // Error handled by API client
@@ -165,7 +256,7 @@ export function WizardStep2() {
         setIsUploading(false);
       }
     } else if (importMethod === 'copy') {
-      // For copy method, leads are already in state, just proceed
+      // For copy method, leads are already saved, just proceed
       nextStep();
     } else if (importMethod === 'csv') {
       toast.error('Please select a CSV file');
@@ -204,14 +295,28 @@ export function WizardStep2() {
       error: EMAIL_REGEX.test(email.trim()) ? undefined : 'Invalid email format',
     };
 
+    // Append to existing leads in preview
     setLeads([...state.leads, lead]);
     setManualLead({ email: '', first_name: '', company: '' });
     toast.success('Lead added');
   };
 
-  const handleRemoveLead = (index: number) => {
-    setLeads(state.leads.filter((_, i) => i !== index));
-    toast.success('Lead removed');
+  const handleRemoveLead = async (index: number, isSaved: boolean, leadId?: string) => {
+    if (isSaved && leadId && state.campaignId) {
+      // Delete from database
+      try {
+        await leadsApi.delete(state.campaignId, leadId);
+        setSavedLeads(savedLeads.filter((l) => l.id !== leadId));
+        toast.success('Lead deleted');
+      } catch (err) {
+        console.error('Failed to delete lead:', err);
+        toast.error('Failed to delete lead');
+      }
+    } else {
+      // Remove from local preview state
+      setLeads(state.leads.filter((_, i) => i !== index));
+      toast.success('Lead removed');
+    }
   };
 
   const handleAddLeadToPreview = () => {
@@ -412,14 +517,14 @@ export function WizardStep2() {
         </div>
       )}
 
-      {/* Preview Table */}
-      {state.leads.length > 0 && (
+      {/* Preview Table - Show all leads (saved from DB + newly added) */}
+      {(state.leads.length > 0 || savedLeads.length > 0) && (
         <div className="border rounded-lg overflow-hidden">
           <div className="bg-gray-50 px-4 py-3 border-b flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">
-              Preview ({validLeads.length} valid, {invalidLeads.length} invalid)
+              All Leads ({validLeads.length} valid, {invalidLeads.length} invalid)
             </span>
-            {importMethod === 'csv' && (
+            {importMethod === 'csv' && state.leads.length > 0 && (
               <button
                 onClick={() => setShowAddLeadModal(true)}
                 className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -453,9 +558,10 @@ export function WizardStep2() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
+                {/* Show unsaved leads from state */}
                 {state.leads.map((lead, index) => (
                   <tr
-                    key={index}
+                    key={`unsaved-${index}`}
                     className={lead.isValid ? 'bg-white' : 'bg-red-50'}
                   >
                     <td className="px-4 py-2 text-sm text-gray-900">
@@ -476,7 +582,7 @@ export function WizardStep2() {
                     </td>
                     <td className="px-4 py-2 text-center">
                       <button
-                        onClick={() => handleRemoveLead(index)}
+                        onClick={() => handleRemoveLead(index, false)}
                         className="text-red-600 hover:text-red-700 p-1"
                         title="Remove lead"
                       >
@@ -493,6 +599,7 @@ export function WizardStep2() {
         </div>
       )}
 
+
       {/* Navigation */}
       <div className="flex justify-between pt-4 border-t">
         <Button variant="ghost" onClick={prevStep}>
@@ -500,7 +607,7 @@ export function WizardStep2() {
         </Button>
         <Button
           onClick={handleUploadAndContinue}
-          disabled={validLeads.length === 0}
+          disabled={validLeads.length === 0 && savedLeads.length === 0}
           isLoading={isUploading}
         >
           Next: Email Templates

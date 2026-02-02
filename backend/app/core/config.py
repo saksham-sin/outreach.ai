@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
 
     # OpenAI
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-5-mini"
 
     # Email Provider Selection
@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     FRONTEND_URL: str
 
     # Webhook Security
-    WEBHOOK_USERNAME: str
-    WEBHOOK_PASSWORD: str
+    WEBHOOK_USERNAME: str = ""
+    WEBHOOK_PASSWORD: str = ""
 
     # Worker Settings
     WORKER_POLL_INTERVAL_SECONDS: int = 5  # Check for pending emails every 5 seconds

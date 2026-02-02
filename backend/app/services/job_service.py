@@ -166,6 +166,17 @@ class JobService:
         is_valid, reason = await self._validate_job_for_execution(job)
         
         if not is_valid:
+            # If campaign is paused or not active, keep job pending for resume
+            if reason.startswith("Campaign is not active"):
+                job.last_error = reason
+                job.updated_at = datetime.now(timezone.utc)
+                job.scheduled_at = datetime.now(timezone.utc) + timedelta(
+                    seconds=settings.WORKER_POLL_INTERVAL_SECONDS
+                )
+                await self.session.flush()
+                logger.info(f"Job {job.id} deferred: {reason}")
+                return False
+
             job.status = JobStatus.SKIPPED
             job.last_error = reason
             job.updated_at = datetime.now(timezone.utc)
@@ -500,3 +511,63 @@ class JobService:
             .options(selectinload(EmailJob.lead))
         )
         return list(result.scalars().all())
+
+    async def get_step_summary(
+        self,
+        campaign_id: UUID,
+    ) -> list[dict]:
+        """
+        Get aggregated job status for each step in a campaign.
+        
+        Returns counts of sent, pending, scheduled, failed, skipped for each step.
+        Also includes the next scheduled time for pending jobs (only for non-terminal leads).
+        
+        Args:
+            campaign_id: Campaign ID
+            
+        Returns:
+            List of dicts with step_number and status counts
+        """
+        from sqlalchemy import func, case, and_
+        
+        # For pending jobs, we need to exclude those for terminal leads
+        # Join with Lead to check lead status
+        result = await self.session.execute(
+            select(
+                EmailJob.step_number,
+                func.count(case((EmailJob.status == JobStatus.SENT, 1))).label('sent'),
+                # Pending: only count if lead is not terminal
+                func.count(case((
+                    and_(
+                        EmailJob.status == JobStatus.PENDING,
+                        Lead.status.not_in([LeadStatus.REPLIED, LeadStatus.FAILED])
+                    ), 1
+                ))).label('pending'),
+                func.count(case((EmailJob.status == JobStatus.FAILED, 1))).label('failed'),
+                func.count(case((EmailJob.status == JobStatus.SKIPPED, 1))).label('skipped'),
+                # Next scheduled: only for pending jobs with non-terminal leads
+                func.min(case((
+                    and_(
+                        EmailJob.status == JobStatus.PENDING,
+                        Lead.status.not_in([LeadStatus.REPLIED, LeadStatus.FAILED])
+                    ), EmailJob.scheduled_at
+                ))).label('next_scheduled_at'),
+            )
+            .join(Lead, EmailJob.lead_id == Lead.id)
+            .where(EmailJob.campaign_id == campaign_id)
+            .group_by(EmailJob.step_number)
+            .order_by(EmailJob.step_number)
+        )
+        
+        rows = result.all()
+        return [
+            {
+                'step_number': row.step_number,
+                'sent': row.sent or 0,
+                'pending': row.pending or 0,
+                'failed': row.failed or 0,
+                'skipped': row.skipped or 0,
+                'next_scheduled_at': row.next_scheduled_at,
+            }
+            for row in rows
+        ]

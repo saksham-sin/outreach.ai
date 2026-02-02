@@ -310,6 +310,7 @@ async def mark_lead_replied(
     webhook-based reply detection is not available (REPLY_MODE=simulated).
     
     Only works when REPLY_MODE is set to 'simulated'.
+    Also cancels all pending follow-up emails for this lead.
     """
     # Check if simulated reply mode is enabled
     reply_mode = getattr(settings, 'REPLY_MODE', 'webhook')
@@ -341,12 +342,117 @@ async def mark_lead_replied(
             detail=f"Cannot mark lead as replied. Current status: {lead.status.value}",
         )
     
-    # Update lead status to replied
-    lead.status = LeadStatus.REPLIED
-    lead.updated_at = datetime.now(timezone.utc)
+    # Use the service method which also cancels pending jobs
+    await service.mark_lead_replied(lead_id)
     await session.commit()
     
     return MarkRepliedResponse(
         success=True,
         message=f"Lead {lead.email} marked as replied",
+    )
+
+class EmailSendEvent(BaseModel):
+    """Single email send event in the timeline."""
+    step_number: int
+    status: str  # 'sent', 'pending', 'failed', 'skipped'
+    scheduled_at: datetime
+    sent_at: Optional[datetime]
+    subject: str
+    attempts: int
+    last_error: Optional[str]
+
+
+class EmailHistoryResponse(BaseModel):
+    """Response containing email send history for a lead."""
+    lead_id: UUID
+    email: str
+    events: list[EmailSendEvent]
+
+
+@router.get(
+    "/{lead_id}/email-history",
+    response_model=EmailHistoryResponse,
+    summary="Get email send history",
+    description="Get the email send history and timeline for a specific lead.",
+)
+async def get_lead_email_history(
+    campaign_id: UUID,
+    lead_id: UUID,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> EmailHistoryResponse:
+    """
+    Get email send history for a lead.
+    
+    Returns a timeline of all email send events for the lead, including
+    sent timestamps, status, and any error messages.
+    """
+    from sqlalchemy import select
+    from app.models.campaign import Campaign
+    from app.models.lead import Lead
+    from app.models.email_job import EmailJob
+    
+    # Verify campaign belongs to user and lead belongs to campaign
+    result = await session.execute(
+        select(Campaign).where(
+            Campaign.id == campaign_id,
+            Campaign.user_id == current_user.id
+        )
+    )
+    campaign = result.scalar_one_or_none()
+    
+    if not campaign:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found",
+        )
+    
+    # Get the lead
+    result = await session.execute(
+        select(Lead).where(
+            Lead.id == lead_id,
+            Lead.campaign_id == campaign_id
+        )
+    )
+    lead = result.scalar_one_or_none()
+    
+    if not lead:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Lead not found",
+        )
+    
+    # Get all email jobs for this lead, ordered by step and creation date
+    result = await session.execute(
+        select(EmailJob)
+        .where(EmailJob.lead_id == lead_id)
+        .order_by(EmailJob.step_number, EmailJob.created_at)
+    )
+    jobs = list(result.scalars().all())
+    
+    # Get templates to fetch subject lines
+    from app.models.email_template import EmailTemplate
+    result = await session.execute(
+        select(EmailTemplate).where(EmailTemplate.campaign_id == campaign_id)
+    )
+    templates = {t.step_number: t for t in result.scalars().all()}
+    
+    # Convert jobs to events
+    events = []
+    for job in jobs:
+        template = templates.get(job.step_number)
+        events.append(EmailSendEvent(
+            step_number=job.step_number,
+            status=job.status.value,
+            scheduled_at=job.scheduled_at,
+            sent_at=job.sent_at,
+            subject=template.subject if template else f"Step {job.step_number}",
+            attempts=job.attempts,
+            last_error=job.last_error,
+        ))
+    
+    return EmailHistoryResponse(
+        lead_id=lead_id,
+        email=lead.email,
+        events=events,
     )

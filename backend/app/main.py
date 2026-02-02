@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import auth, campaigns, leads, templates, webhooks, jobs
 from app.infrastructure.database import init_db, close_db
-from app.services.worker import get_worker
 from app.core.config import get_settings
 
 # Configure logging
@@ -74,19 +73,10 @@ async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
     
-    # Start background worker
-    worker = get_worker()
-    await worker.start()
-    logger.info("Background worker started")
-    
     yield
     
     # Shutdown
     logger.info("Shutting down application...")
-    
-    # Stop background worker
-    await worker.stop()
-    logger.info("Background worker stopped")
     
     # Close database connections
     await close_db()
@@ -135,5 +125,5 @@ async def health_check():
     return {
         "status": "healthy",
         "database": "connected",
-        "worker": "running",
+        "worker": "separate-process",
     }

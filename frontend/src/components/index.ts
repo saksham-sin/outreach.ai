@@ -10,3 +10,5 @@ export { EmptyState } from './EmptyState';
 export { Header } from './Header';
 export { Countdown } from './Countdown';
 export { EmailPreviewModal } from './EmailPreviewModal';
+export { RichTextEditor } from './RichTextEditor';
+export { VariableHighlightPreview } from './VariableHighlightPreview';
