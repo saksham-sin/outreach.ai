@@ -351,6 +351,11 @@ class JobService:
         next_step = completed_job.step_number + 1
         
         if next_step > MAX_CAMPAIGN_STEPS:
+            # All emails sent - mark lead as completed if not already terminal
+            if completed_job.lead and not completed_job.lead.status.is_terminal():
+                completed_job.lead.status = LeadStatus.COMPLETED
+                completed_job.lead.updated_at = datetime.now(timezone.utc)
+                logger.info(f"Lead {completed_job.lead_id} completed all steps in campaign {completed_job.campaign_id}")
             return None
         
         # Check if template exists for next step
@@ -367,6 +372,11 @@ class JobService:
             logger.debug(
                 f"No template for step {next_step} in campaign {completed_job.campaign_id}"
             )
+            # Mark lead as completed since no next step available
+            if completed_job.lead and not completed_job.lead.status.is_terminal():
+                completed_job.lead.status = LeadStatus.COMPLETED
+                completed_job.lead.updated_at = datetime.now(timezone.utc)
+                logger.info(f"Lead {completed_job.lead_id} completed all available steps in campaign {completed_job.campaign_id}")
             return None
         
         # Calculate scheduled time
@@ -544,7 +554,7 @@ class JobService:
                 func.count(case((
                     and_(
                         EmailJob.status == JobStatus.PENDING,
-                        Lead.status.not_in([LeadStatus.REPLIED, LeadStatus.FAILED])
+                        Lead.status.not_in([LeadStatus.COMPLETED, LeadStatus.REPLIED, LeadStatus.FAILED])
                     ), 1
                 ))).label('pending'),
                 func.count(case((EmailJob.status == JobStatus.FAILED, 1))).label('failed'),
@@ -553,7 +563,7 @@ class JobService:
                 func.min(case((
                     and_(
                         EmailJob.status == JobStatus.PENDING,
-                        Lead.status.not_in([LeadStatus.REPLIED, LeadStatus.FAILED])
+                        Lead.status.not_in([LeadStatus.COMPLETED, LeadStatus.REPLIED, LeadStatus.FAILED])
                     ), EmailJob.scheduled_at
                 ))).label('next_scheduled_at'),
             )
