@@ -28,3 +28,6 @@ python-multipart>=0.0.9
 
 # Utilities
 python-dotenv>=1.0.0
+
+# Webhook Verification
+svix>=1.0.0
