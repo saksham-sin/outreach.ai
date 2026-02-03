@@ -22,11 +22,17 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Error messages that should be silently handled (no toast)
+const SILENT_ERRORS = [
+  'already exists',
+];
+
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<{ detail?: string }>) => {
     const message = error.response?.data?.detail || error.message || 'An error occurred';
+    const messageLower = message.toLowerCase();
     
     if (error.response?.status === 401) {
       // Clear token and redirect to login
@@ -34,7 +40,8 @@ apiClient.interceptors.response.use(
       if (typeof window !== 'undefined') {
         window.location.hash = '#/login';
       }
-    } else {
+    } else if (!SILENT_ERRORS.some(err => messageLower.includes(err))) {
+      // Only show toast if not a silent error
       toast.error(message);
     }
     

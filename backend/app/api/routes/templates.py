@@ -333,10 +333,11 @@ async def preview_template(
             detail="Campaign not found",
         )
     
-    # Get first lead for preview data
+    # Get first lead for preview data (ordered by creation)
     lead_result = await session.execute(
         select(Lead)
         .where(Lead.campaign_id == campaign_id)
+        .order_by(Lead.created_at)
         .limit(1)
     )
     lead = lead_result.scalar_one_or_none()
