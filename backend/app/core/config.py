@@ -22,13 +22,13 @@ class Settings(BaseSettings):
 
     # Email Sender Configuration (Dual Sender Identity)
     # AUTH emails: Magic links, transactional (no-reply)
-    EMAIL_AUTH_FROM_ADDRESS: str = ""  # e.g., no-reply@outreachai-demo.online
+    EMAIL_AUTH_FROM_ADDRESS: str = ""  # e.g., no-reply@example.com
     EMAIL_AUTH_FROM_NAME: str = "Outreach AI"
     
     # OUTREACH emails: Campaign and follow-ups (replies expected)
-    EMAIL_OUTREACH_FROM_ADDRESS: str = ""  # e.g., hello@outreachai-demo.online
+    EMAIL_OUTREACH_FROM_ADDRESS: str = ""  # e.g., hello@example.com
     EMAIL_OUTREACH_FROM_NAME: str = "Outreach AI"
-    EMAIL_OUTREACH_REPLY_TO: str = ""  # e.g., hello@outreachai-demo.online (same as from)
+    EMAIL_OUTREACH_REPLY_TO: str = ""  # e.g., hello@example.com (same as from)
     
     # Legacy unified email settings (deprecated - use specific AUTH/OUTREACH settings above)
     EMAIL_FROM_ADDRESS: str = ""  # Fallback for backwards compatibility
