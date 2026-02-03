@@ -1,7 +1,5 @@
 """Factory for creating email provider instances.
 
-Note: Initially planned for multi-provider support (Postmark/Resend).
-Postmark implementation removed to reduce scope and avoid dead code.
 Resend is the sole production provider.
 """
 

@@ -23,6 +23,7 @@ export function DashboardPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const replyMode = (import.meta.env.VITE_REPLY_MODE || 'SIMULATED').toUpperCase();
 
   const fetchCampaigns = async () => {
     try {
@@ -133,7 +134,12 @@ export function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Campaigns</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Campaigns</h1>
+            <p className="text-xs text-gray-500 mt-1">
+              Reply detection: {replyMode}
+            </p>
+          </div>
           <Button onClick={() => navigate('/campaigns/new')}>
             New Campaign
           </Button>

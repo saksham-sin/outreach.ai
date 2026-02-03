@@ -42,7 +42,8 @@ export function CampaignDetailPage() {
   const [previewModal, setPreviewModal] = useState({ open: false, templateId: '', stepNumber: 1 });
   const [selectedLeadJobs, setSelectedLeadJobs] = useState<LeadJobInfo[]>([]);
   const [isLoadingLeadJobs, setIsLoadingLeadJobs] = useState(false);
-  const enableSimulatedReply = import.meta.env.VITE_ENABLE_SIMULATED_REPLY === 'true';
+  const replyMode = (import.meta.env.VITE_REPLY_MODE || 'SIMULATED').toUpperCase();
+  const enableSimulatedReply = replyMode === 'SIMULATED';
 
   const getDelayMinutes = (delayMinutes: number, delayDays: number) => {
     if (delayMinutes && delayMinutes > 0) return delayMinutes;
@@ -677,6 +678,16 @@ export function CampaignDetailPage() {
                 >
                   Mark as Replied
                 </Button>
+              </div>
+            )}
+            {!enableSimulatedReply && selectedLead.status !== LeadStatus.REPLIED && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  Reply detection is webhook-based ({replyMode}).
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Replies will stop follow-ups automatically.
+                </p>
               </div>
             )}
           </div>

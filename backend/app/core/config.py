@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # Resend Email Provider (sole production provider)
     RESEND_API_KEY: str = ""
     RESEND_FROM_DOMAIN: str = ""  # Custom domain for sending emails
+    RESEND_INBOUND_ADDRESS: str = ""  # Inbound/receiving address for reply detection
+    RESEND_WEBHOOK_SECRET: str = ""  # Resend signing secret for webhook verification
+
+    # Reply detection mode
+    REPLY_MODE: str = "SIMULATED"  # SIMULATED | RESEND-WEBHOOK
 
     # App URLs
     APP_BASE_URL: str

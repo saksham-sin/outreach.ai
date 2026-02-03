@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, campaigns, leads, templates, jobs
+from app.api.routes import auth, campaigns, leads, templates, jobs, webhooks
 from app.infrastructure.database import init_db, close_db
 from app.core.config import get_settings
 from app.services.worker import get_worker
@@ -36,12 +36,26 @@ def _validate_config() -> None:
     # Check OpenAI config
     if not settings.OPENAI_API_KEY:
         logger.warning("OPENAI_API_KEY not set - AI email generation will fail")
-    
-    # Note: Webhook-based inbound email handling (reply detection) deferred.
-    # Using simulated reply mode via manual API for demo scope discipline.
+
+    # Check inbound reply detection config (Resend receiving)
+    if not settings.RESEND_INBOUND_ADDRESS:
         logger.warning(
-            "WEBHOOK_USERNAME or WEBHOOK_PASSWORD not set - "
-            "webhook endpoints will not be protected"
+            "RESEND_INBOUND_ADDRESS not set - reply detection via inbound webhook disabled"
+        )
+
+    # Reply detection mode validation
+    reply_mode = (settings.REPLY_MODE or "").upper()
+    if reply_mode not in {"SIMULATED", "RESEND-WEBHOOK"}:
+        logger.warning(
+            f"REPLY_MODE '{settings.REPLY_MODE}' is invalid. Using SIMULATED mode."
+        )
+    else:
+        logger.info(f"Reply detection mode: {reply_mode}")
+
+    # Check webhook security
+    if not settings.RESEND_WEBHOOK_SECRET:
+        logger.warning(
+            "RESEND_WEBHOOK_SECRET not set - webhook signature verification disabled"
         )
     
     logger.info("Configuration validation complete")
@@ -114,6 +128,7 @@ app.include_router(campaigns.router, prefix="/api")
 app.include_router(leads.router, prefix="/api")
 app.include_router(templates.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
+app.include_router(webhooks.router, prefix="/api")
 
 
 @app.get("/", tags=["Health"])

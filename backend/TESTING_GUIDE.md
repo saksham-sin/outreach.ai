@@ -120,7 +120,7 @@ SELECT COUNT(*) FROM email_jobs WHERE status = 'sent';
 ### Setup
 1. **Temporarily break** the email provider by setting invalid API key:
    ```env
-   POSTMARK_SERVER_TOKEN=invalid-token-12345
+   RESEND_API_KEY=invalid-token-12345
    ```
 
 2. Restart backend
@@ -149,21 +149,21 @@ LIMIT 5;
 
 ---
 
-## Test 4: Missing Postmark Inbound Address
+## Test 4: Missing Resend Inbound Address
 
 **Goal:** Verify app starts without crash when inbound address is missing.
 
 ### Setup
 1. Clear the inbound address in `.env`:
    ```env
-   POSTMARK_INBOUND_ADDRESS=
+   RESEND_INBOUND_ADDRESS=
    ```
 
 2. Start backend and watch startup logs
 
 ### Expected Result
 ```
-WARNING - POSTMARK_INBOUND_ADDRESS not set - reply detection disabled. 
+WARNING - RESEND_INBOUND_ADDRESS not set - reply detection disabled. 
 Set this to enable webhook-based reply detection.
 ```
 
@@ -184,21 +184,18 @@ Set this to enable webhook-based reply detection.
    ```env
    DATABASE_URL=<valid-url>
    SECRET_KEY=test-key
-   POSTMARK_SERVER_TOKEN=
-   POSTMARK_INBOUND_ADDRESS=
+   RESEND_API_KEY=
+   RESEND_INBOUND_ADDRESS=
    OPENAI_API_KEY=
-   WEBHOOK_USERNAME=
-   WEBHOOK_PASSWORD=
    ```
 
 2. Start backend
 
 ### Expected Warnings in Logs
 ```
-WARNING - POSTMARK_SERVER_TOKEN not set - email sending will fail
-WARNING - POSTMARK_INBOUND_ADDRESS not set - reply detection disabled. Set this to enable webhook-based reply detection.
+WARNING - RESEND_API_KEY not set - email sending will fail
+WARNING - RESEND_INBOUND_ADDRESS not set - reply detection disabled. Set this to enable webhook-based reply detection.
 WARNING - OPENAI_API_KEY not set - AI email generation will fail
-WARNING - WEBHOOK_USERNAME or WEBHOOK_PASSWORD not set - webhook endpoints will not be protected
 INFO - Configuration validation complete
 ```
 
@@ -343,5 +340,5 @@ This runs:
 - Reply/send race simulation
 - Provider exception handling
 - Config validation tests
-- Postmark guard tests
+- Resend inbound guard tests
 - Concurrent worker simulation

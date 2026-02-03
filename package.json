@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "react-datepicker": "^9.1.0",
+    "tailwindcss-mcp-server": "^0.1.1"
+  }
+}

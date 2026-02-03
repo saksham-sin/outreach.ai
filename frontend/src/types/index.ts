@@ -192,7 +192,7 @@ export interface EmailJob {
   status: JobStatus;
   attempts: number;
   last_error: string | null;
-  postmark_message_id: string | null;
+  message_id: string | null;
   created_at: string;
   updated_at: string;
 }

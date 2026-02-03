@@ -6,7 +6,7 @@ Tests:
 2. Reply/send race condition closure
 3. Provider exception handling
 4. Config validation at startup
-5. Postmark inbound address guards
+5. Resend inbound address guards
 
 Run with: python test_reliability_fixes.py
 """
@@ -30,7 +30,7 @@ from app.models.campaign_tag import CampaignTag
 from app.models.user import User
 from app.domain.enums import JobStatus, LeadStatus, CampaignStatus, EmailTone
 from app.infrastructure.email_provider import EmailResult, EmailMetadata
-from app.infrastructure.postmark_provider import PostmarkProvider
+from app.infrastructure.resend_provider import ResendProvider
 from app.core.config import get_settings
 
 
@@ -443,17 +443,17 @@ async def test_provider_exception_handling():
 
 
 # =============================================================================
-# TEST 4: Postmark Inbound Address Guard
+# TEST 4: Resend Inbound Address Guard
 # =============================================================================
 
-def test_postmark_inbound_address_guard():
-    """Test that Postmark handles missing inbound address gracefully."""
-    print_test_header("Postmark Inbound Address Guard")
+def test_resend_inbound_address_guard():
+    """Test that Resend handles missing inbound address gracefully."""
+    print_test_header("Resend Inbound Address Guard")
     
     try:
         # Test 1: Empty inbound address
-        with patch.object(PostmarkProvider, '__init__', lambda self: None):
-            provider = PostmarkProvider()
+        with patch.object(ResendProvider, '__init__', lambda self: None):
+            provider = ResendProvider()
             provider.inbound_address = ""
             
             result = provider._get_reply_to_address(uuid4())
@@ -461,8 +461,8 @@ def test_postmark_inbound_address_guard():
             print_success("Empty inbound address handled correctly")
         
         # Test 2: None inbound address
-        with patch.object(PostmarkProvider, '__init__', lambda self: None):
-            provider = PostmarkProvider()
+        with patch.object(ResendProvider, '__init__', lambda self: None):
+            provider = ResendProvider()
             provider.inbound_address = None
             
             result = provider._get_reply_to_address(uuid4())
@@ -470,8 +470,8 @@ def test_postmark_inbound_address_guard():
             print_success("None inbound address handled correctly")
         
         # Test 3: Invalid format (no @)
-        with patch.object(PostmarkProvider, '__init__', lambda self: None):
-            provider = PostmarkProvider()
+        with patch.object(ResendProvider, '__init__', lambda self: None):
+            provider = ResendProvider()
             provider.inbound_address = "invalid-email-format"
             
             result = provider._get_reply_to_address(uuid4())
@@ -479,8 +479,8 @@ def test_postmark_inbound_address_guard():
             print_success("Invalid format handled correctly")
         
         # Test 4: Valid inbound address
-        with patch.object(PostmarkProvider, '__init__', lambda self: None):
-            provider = PostmarkProvider()
+        with patch.object(ResendProvider, '__init__', lambda self: None):
+            provider = ResendProvider()
             provider.inbound_address = "reply@example.com"
             lead_id = uuid4()
             
@@ -490,10 +490,10 @@ def test_postmark_inbound_address_guard():
             assert "@example.com" in result, "Should include domain"
             print_success(f"Valid address processed correctly: {result}")
         
-        results.add_pass("Postmark inbound address guard")
+        results.add_pass("Resend inbound address guard")
         
     except Exception as e:
-        results.add_fail("Postmark inbound address guard", str(e))
+        results.add_fail("Resend inbound address guard", str(e))
 
 
 # =============================================================================
@@ -511,13 +511,11 @@ def test_config_validation():
         with patch('app.main.settings') as mock_settings, \
              patch('app.main.logger') as mock_logger:
             
-            # Test Case 1: Missing Postmark config
-            mock_settings.EMAIL_PROVIDER = "postmark"
-            mock_settings.POSTMARK_SERVER_TOKEN = ""
-            mock_settings.POSTMARK_INBOUND_ADDRESS = ""
+            # Test Case 1: Missing Resend inbound address
+            mock_settings.RESEND_API_KEY = "test-key"
+            mock_settings.RESEND_FROM_DOMAIN = "example.com"
+            mock_settings.RESEND_INBOUND_ADDRESS = ""
             mock_settings.OPENAI_API_KEY = "test-key"
-            mock_settings.WEBHOOK_USERNAME = "user"
-            mock_settings.WEBHOOK_PASSWORD = "pass"
             
             _validate_config()
             
@@ -525,18 +523,16 @@ def test_config_validation():
             warning_calls = [call for call in mock_logger.warning.call_args_list]
             warning_messages = [str(call) for call in warning_calls]
             
-            assert any("POSTMARK_SERVER_TOKEN" in str(call) for call in warning_calls), \
-                "Should warn about missing POSTMARK_SERVER_TOKEN"
-            assert any("POSTMARK_INBOUND_ADDRESS" in str(call) for call in warning_calls), \
-                "Should warn about missing POSTMARK_INBOUND_ADDRESS"
-            
-            print_success("Postmark config warnings logged correctly")
+            assert any("RESEND_INBOUND_ADDRESS" in str(call) for call in warning_calls), \
+                "Should warn about missing RESEND_INBOUND_ADDRESS"
+
+            print_success("Resend inbound address warning logged correctly")
             
             # Test Case 2: Missing OpenAI config
             mock_logger.reset_mock()
-            mock_settings.EMAIL_PROVIDER = "resend"
             mock_settings.RESEND_API_KEY = "test-key"
             mock_settings.RESEND_FROM_DOMAIN = "example.com"
+            mock_settings.RESEND_INBOUND_ADDRESS = "reply@example.com"
             mock_settings.OPENAI_API_KEY = ""
             
             _validate_config()
@@ -546,19 +542,6 @@ def test_config_validation():
                 "Should warn about missing OPENAI_API_KEY"
             
             print_success("OpenAI config warnings logged correctly")
-            
-            # Test Case 3: Missing webhook security
-            mock_logger.reset_mock()
-            mock_settings.WEBHOOK_USERNAME = ""
-            mock_settings.WEBHOOK_PASSWORD = ""
-            
-            _validate_config()
-            
-            warning_calls = [call for call in mock_logger.warning.call_args_list]
-            assert any("WEBHOOK" in str(call) for call in warning_calls), \
-                "Should warn about missing webhook credentials"
-            
-            print_success("Webhook security warnings logged correctly")
         
         results.add_pass("Config validation at startup")
         
@@ -718,7 +701,7 @@ async def run_all_tests():
     await test_max_retry_enforcement()
     
     # Run sync tests
-    test_postmark_inbound_address_guard()
+    test_resend_inbound_address_guard()
     test_config_validation()
     
     # Print summary
