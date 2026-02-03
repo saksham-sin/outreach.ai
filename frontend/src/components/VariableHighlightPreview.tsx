@@ -9,7 +9,7 @@ interface VariableHighlightPreviewProps {
 export function VariableHighlightPreview({
   htmlContent,
 }: VariableHighlightPreviewProps) {
-  const highlightedHtml = htmlContent.replaceAll(/{{[^}]+}}/g, (match) => {
+  const highlightedHtml = htmlContent.replaceAll(/{{[^}]+}}/g, (match: string) => {
     return `<span class="vhp-var" title="This variable will be replaced by lead information">${match}</span>`;
   });
 

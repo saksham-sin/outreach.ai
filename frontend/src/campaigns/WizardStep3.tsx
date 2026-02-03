@@ -115,7 +115,7 @@ export function WizardStep3() {
     }));
   };
   const stripHtml = (html: string) =>
-    html.replaceAll(/<[^>]*>/g, '').replaceAll('&nbsp;', ' ').trim();
+    html.replace(/<[^>]*>/g, '').replaceAll('&nbsp;', ' ').trim();
 
   const insertPlaceholder = (stepNumber: number, placeholder: string) => {
     const insertFn = editorInsertRefs.current[stepNumber];
