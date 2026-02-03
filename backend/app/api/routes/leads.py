@@ -310,6 +310,12 @@ async def mark_lead_replied(
     Automatic webhook-based inbound reply detection deferred for scope discipline.
     Also cancels all pending follow-up emails for this lead.
     """
+    if (settings.REPLY_MODE or "SIMULATED").upper() != "SIMULATED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reply mode is not SIMULATED",
+        )
+
     service = LeadService(session)
     lead = await service.get_lead(lead_id, current_user.id)
     

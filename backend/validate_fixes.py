@@ -73,20 +73,20 @@ def main():
         "Exception handler routes to retry logic"
     ))
     
-    # Check 4: Postmark inbound address guard
-    print(f"\n{Colors.BLUE}Checking: Postmark Config Guards{Colors.END}")
+    # Check 4: Resend inbound address guard
+    print(f"\n{Colors.BLUE}Checking: Resend Inbound Config Guards{Colors.END}")
     checks.append(check_file_contains(
-        "app/infrastructure/postmark_provider.py",
-        r"def _get_reply_to_address\(self, lead_id: UUID\) -> Optional\[str\]",
+        "app/infrastructure/resend_provider.py",
+        r"def _get_reply_to_address\(self, lead_id\)",
         "Reply-to method returns Optional[str]"
     ))
     checks.append(check_file_contains(
-        "app/infrastructure/postmark_provider.py",
+        "app/infrastructure/resend_provider.py",
         r"if not self\.inbound_address or \"@\" not in self\.inbound_address:",
         "Guard against missing/invalid inbound address"
     ))
     checks.append(check_file_contains(
-        "app/infrastructure/postmark_provider.py",
+        "app/infrastructure/resend_provider.py",
         r"reply_to = self\._get_reply_to_address\(metadata\.lead_id\)\s+if reply_to:",
         "Null-check before setting ReplyTo header"
     ))
@@ -105,7 +105,7 @@ def main():
     ))
     checks.append(check_file_contains(
         "app/main.py",
-        r"logger\.warning.*POSTMARK_INBOUND_ADDRESS.*reply detection",
+        r"logger\.warning.*RESEND_INBOUND_ADDRESS.*reply detection",
         "Warning logged for missing inbound address"
     ))
     

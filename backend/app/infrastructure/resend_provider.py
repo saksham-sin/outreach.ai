@@ -33,7 +33,12 @@ class ResendProvider(EmailProvider):
         # Legacy fallback
         self.from_email = settings.EMAIL_FROM_ADDRESS
         self.from_name = settings.EMAIL_FROM_NAME
-        self.inbound_address = getattr(settings, 'POSTMARK_INBOUND_ADDRESS', None)
+        self.inbound_address = (
+            settings.RESEND_INBOUND_ADDRESS
+            or settings.EMAIL_OUTREACH_REPLY_TO
+            or settings.EMAIL_OUTREACH_FROM_ADDRESS
+            or None
+        )
         self.from_domain = settings.RESEND_FROM_DOMAIN
     
     def _get_sender_config(self, email_type: EmailType) -> tuple[str, str]:

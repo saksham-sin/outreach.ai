@@ -13,7 +13,7 @@ Outreach.AI helps you run email campaigns at scale. Create campaigns, upload lea
 - ✅ **AI Email Generation** - Generate personalized emails using OpenAI GPT
 - ✅ **Automated Scheduling** - Schedule emails with automatic follow-ups
 - ✅ **Reply Detection** - Automatically detect and stop follow-ups when replies arrive
-- ✅ **Multi-Provider Support** - Send via Postmark or Resend
+- ✅ **Email Delivery** - Send via Resend
 - ✅ **Magic Link Auth** - Passwordless authentication
 - ✅ **Email Timeline** - View email history for each lead
 
@@ -25,7 +25,7 @@ Outreach.AI helps you run email campaigns at scale. Create campaigns, upload lea
 - **Node.js** 18+
 - **PostgreSQL** 15+
 - **OpenAI API Key** (for AI email generation)
-- **Postmark or Resend** account (for email sending)
+- **Resend** account (for email sending)
 
 ### 1. Backend Setup
 

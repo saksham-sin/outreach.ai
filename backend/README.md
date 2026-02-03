@@ -7,7 +7,7 @@ A production-ready backend for AI-powered email outreach campaigns.
 - **Campaign Management**: Create, launch, pause, resume, and duplicate campaigns
 - **Lead Management**: Import leads via CSV, copy between campaigns
 - **AI Email Generation**: Generate personalized email templates using OpenAI
-- **Email Delivery**: Send real emails via Postmark with tracking
+- **Email Delivery**: Send real emails via Resend with tracking
 - **Follow-up Scheduling**: Automatic follow-up emails with configurable delays
 - **Reply Detection**: Automatically stop follow-ups when replies are detected
 - **Magic Link Auth**: Passwordless authentication via email
@@ -17,7 +17,7 @@ A production-ready backend for AI-powered email outreach campaigns.
 - **Framework**: FastAPI (Python 3.11+)
 - **Database**: PostgreSQL with SQLModel/SQLAlchemy
 - **AI**: OpenAI via LangChain
-- **Email**: Postmark (sending + inbound webhooks)
+- **Email**: Resend (sending + inbound webhooks)
 - **Auth**: JWT-based magic link authentication
 
 ## Quick Start
@@ -26,7 +26,7 @@ A production-ready backend for AI-powered email outreach campaigns.
 
 - Python 3.11+
 - PostgreSQL database
-- Postmark account
+- Resend account
 - OpenAI API key
 
 ### 2. Setup
@@ -63,18 +63,17 @@ SECRET_KEY=your-secret-key-generate-with-openssl-rand-hex-32
 # OpenAI
 OPENAI_API_KEY=sk-your-openai-api-key
 
-# Postmark
-POSTMARK_SERVER_TOKEN=your-postmark-server-token
-POSTMARK_INBOUND_ADDRESS=reply@yourdomain.com
-FROM_EMAIL=notifications@yourdomain.com
+# Resend
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_DOMAIN=yourdomain.com
+RESEND_INBOUND_ADDRESS=reply@yourdomain.com
+EMAIL_AUTH_FROM_ADDRESS=no-reply@yourdomain.com
+EMAIL_OUTREACH_FROM_ADDRESS=hello@yourdomain.com
+EMAIL_OUTREACH_REPLY_TO=hello@yourdomain.com
 
 # App URLs
 APP_BASE_URL=http://localhost:8000
 FRONTEND_URL=http://localhost:3000
-
-# Webhook Security
-WEBHOOK_USERNAME=webhook_user
-WEBHOOK_PASSWORD=webhook_secret_password
 ```
 
 ### 4. Database Setup
@@ -141,33 +140,32 @@ The API will be available at `http://localhost:8000`
 - `POST /api/campaigns/{id}/templates/generate-all` - Generate all steps
 - `POST /api/campaigns/{id}/templates/{id}/rewrite` - Rewrite with AI
 
-### Webhooks (Postmark)
-- `POST /api/webhooks/postmark/inbound` - Handle reply emails
-- `POST /api/webhooks/postmark/bounce` - Handle bounces
-- `POST /api/webhooks/postmark/delivery` - Handle deliveries
+### Webhooks (Resend)
+- `POST /api/webhooks/resend/inbound` - Handle reply emails
+- `POST /api/webhooks/resend/bounce` - Handle bounces
+- `POST /api/webhooks/resend/delivery` - Handle deliveries
 
-## Postmark Setup
+## Resend Setup
 
 ### 1. Configure Sender
 
-1. Log in to Postmark
-2. Go to Sender Signatures
-3. Add and verify your sending domain/email
+1. Log in to Resend
+2. Verify your sending domain
+3. Configure sender emails
 
 ### 2. Configure Inbound
 
-1. Go to your Server > Inbound
-2. Set up inbound processing
-3. Configure webhook URL: `https://yourdomain.com/api/webhooks/postmark/inbound`
-4. Add HTTP Basic Auth credentials (same as `WEBHOOK_USERNAME`/`WEBHOOK_PASSWORD`)
+1. Configure inbound/receiving domain in Resend
+2. Set webhook URL: `https://yourdomain.com/api/webhooks/resend/inbound`
+3. Use Resend's webhook signing secret for verification
 
 ### 3. Configure Tracking Webhooks
 
-1. Go to your Server > Webhooks
+1. Go to Resend Webhooks
 2. Add webhooks for:
-   - Bounce: `https://yourdomain.com/api/webhooks/postmark/bounce`
-   - Delivery: `https://yourdomain.com/api/webhooks/postmark/delivery`
-3. Add HTTP Basic Auth to each
+   - Bounce: `https://yourdomain.com/api/webhooks/resend/bounce`
+   - Delivery: `https://yourdomain.com/api/webhooks/resend/delivery`
+3. Use Resend's webhook signing secret for verification
 
 ## Project Structure
 
@@ -185,7 +183,7 @@ backend/
 │   │   └── enums.py           # Status enums
 │   ├── infrastructure/
 │   │   ├── database.py        # DB engine and sessions
-│   │   ├── postmark.py        # Postmark email client
+│   │   ├── resend_provider.py # Resend email provider
 │   │   └── llm.py             # LangChain/OpenAI client
 │   ├── models/                # SQLModel database models
 │   ├── services/              # Business logic
@@ -222,11 +220,11 @@ backend/
    
 5. **Background Worker**
    - Polls every 60 seconds
-   - Sends due emails via Postmark
+   - Sends due emails via Resend
    - Schedules follow-ups after successful sends
    
 6. **Reply Detection**
-   - Postmark webhook receives inbound emails
+   - Resend webhook receives inbound emails
    - Lead marked as REPLIED
    - Future jobs automatically skipped
 
