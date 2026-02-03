@@ -202,18 +202,22 @@ export function WizardStep3() {
     setIsGeneratingAll(true);
 
     try {
-      // Only generate for visible steps
-      const numSteps = visibleSteps.length;
-      const response = await templatesApi.generateAll(state.campaignId, numSteps);
-      setTemplates(response.templates);
+      for (const stepNumber of visibleSteps) {
+        setIsGenerating(stepNumber);
+        const template = await templatesApi.generate(state.campaignId, stepNumber);
+        upsertTemplate(template);
+      }
       setAiError(null);
-      toast.success(`Generated ${numSteps} email template${numSteps > 1 ? 's' : ''}`);
+      toast.success(
+        `Generated ${visibleSteps.length} email template${visibleSteps.length > 1 ? 's' : ''}`
+      );
     } catch {
       setAiError(
         'AI generation is temporarily unavailable. You can continue by writing emails manually.'
       );
     } finally {
       setIsGeneratingAll(false);
+      setIsGenerating(null);
     }
   };
 
