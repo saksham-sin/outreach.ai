@@ -76,6 +76,7 @@ class CampaignService:
             .where(Campaign.id == campaign_id, Campaign.user_id == user_id)
             .options(
                 selectinload(Campaign.templates),
+                selectinload(Campaign.tags),
             )
         )
         return result.scalar_one_or_none()
@@ -140,6 +141,7 @@ class CampaignService:
         """List all campaigns for a user."""
         result = await self.session.execute(
             select(Campaign)
+            .options(selectinload(Campaign.tags))
             .where(Campaign.user_id == user_id)
             .order_by(Campaign.created_at.desc())
             .offset(skip)
