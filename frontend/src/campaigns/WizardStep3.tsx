@@ -49,6 +49,8 @@ export function WizardStep3() {
   
   // Refs for RichTextEditor insert functions
   const editorInsertRefs = useRef<Record<number, ((text: string) => void) | null>>({});
+  const creatingStepsRef = useRef<Set<number>>(new Set());
+  const knownTemplateStepsRef = useRef<Set<number>>(new Set());
 
   // Fetch existing templates on mount
   useEffect(() => {
@@ -70,6 +72,13 @@ export function WizardStep3() {
 
     fetchTemplates();
   }, [state.campaignId, setTemplates]);
+
+  // Keep known template steps in sync with state
+  useEffect(() => {
+    knownTemplateStepsRef.current = new Set(
+      state.templates.map((template) => template.step_number)
+    );
+  }, [state.templates]);
 
   useEffect(() => {
     if (state.templates.length === 0) return;
@@ -142,6 +151,7 @@ export function WizardStep3() {
       );
       setTemplates(newTemplates);
     }
+    knownTemplateStepsRef.current.add(template.step_number);
   };
 
   const handleCreateTemplate = async (
@@ -150,12 +160,16 @@ export function WizardStep3() {
     body: string
   ): Promise<EmailTemplate | null> => {
     if (!state.campaignId || isCreatingTemplate === stepNumber) return null;
+    if (creatingStepsRef.current.has(stepNumber)) return null;
+    if (knownTemplateStepsRef.current.has(stepNumber)) return null;
 
     if (!subject.trim() || !stripHtml(body)) return null;
 
     const existing = state.templates.find((t) => t.step_number === stepNumber);
     if (existing) return existing;
 
+    creatingStepsRef.current.add(stepNumber);
+    knownTemplateStepsRef.current.add(stepNumber);
     setIsCreatingTemplate(stepNumber);
 
     try {
@@ -167,10 +181,21 @@ export function WizardStep3() {
       });
       upsertTemplate(created);
       return created;
-    } catch {
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail || '';
+      if (detail.toLowerCase().includes('already exists')) {
+        try {
+          const response = await templatesApi.list(state.campaignId);
+          setTemplates(response.templates);
+          return response.templates.find((t) => t.step_number === stepNumber) || null;
+        } catch {
+          return null;
+        }
+      }
       // Error handled by API client
       return null;
     } finally {
+      creatingStepsRef.current.delete(stepNumber);
       setIsCreatingTemplate(null);
     }
   };
@@ -281,7 +306,8 @@ export function WizardStep3() {
 
     const createdTemplates: EmailTemplate[] = [];
 
-    for (const stepNumber of [1, 2, 3]) {
+    // Only process visible steps (user's actual selections)
+    for (const stepNumber of visibleSteps) {
       const template = getTemplateForStep(stepNumber);
       if (template) continue;
 
