@@ -259,12 +259,12 @@ export function WizardStep5() {
             </svg>
             <div>
               <h4 className="text-sm font-medium text-yellow-800">
-                Cannot launch campaign
+                Not ready to launch yet
               </h4>
               <ul className="mt-1 text-sm text-yellow-700 list-disc list-inside">
-                {leadCount === 0 && <li>No leads imported</li>}
+                {leadCount === 0 && <li>No leads yet — import at least one</li>}
                 {state.templates.length === 0 && (
-                  <li>No email templates created</li>
+                  <li>No email templates yet — add at least one</li>
                 )}
               </ul>
             </div>

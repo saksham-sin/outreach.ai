@@ -482,7 +482,7 @@ export function WizardStep2() {
                 type="email"
                 value={manualLead.email}
                 onChange={(e) => setManualLead({ ...manualLead, email: e.target.value })}
-                placeholder="john@example.com"
+                placeholder="email@company.com"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -494,7 +494,7 @@ export function WizardStep2() {
                 type="text"
                 value={manualLead.first_name}
                 onChange={(e) => setManualLead({ ...manualLead, first_name: e.target.value })}
-                placeholder="John"
+                placeholder="First name"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -506,7 +506,7 @@ export function WizardStep2() {
                 type="text"
                 value={manualLead.company}
                 onChange={(e) => setManualLead({ ...manualLead, company: e.target.value })}
-                placeholder="Acme Inc"
+                placeholder="Company name"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
@@ -629,7 +629,7 @@ export function WizardStep2() {
                   type="email"
                   value={newLead.email}
                   onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                  placeholder="john@example.com"
+                  placeholder="email@company.com"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
@@ -643,7 +643,7 @@ export function WizardStep2() {
                   type="text"
                   value={newLead.first_name}
                   onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })}
-                  placeholder="John"
+                  placeholder="First name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -656,7 +656,7 @@ export function WizardStep2() {
                   type="text"
                   value={newLead.company}
                   onChange={(e) => setNewLead({ ...newLead, company: e.target.value })}
-                  placeholder="Acme Inc"
+                  placeholder="Company name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

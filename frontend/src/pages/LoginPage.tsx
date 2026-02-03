@@ -50,11 +50,14 @@ export function LoginPage() {
               </svg>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              Check your email
+              Check your inbox
             </h2>
-            <p className="text-gray-600 mb-6">
-              We sent a magic link to <strong>{email}</strong>. Click the link to
-              sign in.
+            <p className="text-gray-600 mb-2">
+              We sent a sign-in link to <strong>{email}</strong>. Click it to
+              continue.
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              If it's not there, check spam or try another email.
             </p>
             <Button
               variant="ghost"
@@ -75,9 +78,9 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Outreach AI</h1>
-          <p className="mt-2 text-gray-600">
-            Sign in to manage your email campaigns
+          <h1 className="text-3xl font-bold text-gray-900">Outreach.Ai</h1>
+          <p className="mt-2 text-gray-700 font-medium">
+            Automated outreach that knows when to stop.
           </p>
         </div>
 
@@ -99,12 +102,12 @@ export function LoginPage() {
               size="lg"
               isLoading={isLoading}
             >
-              Send magic link
+              Email me a sign-in link
             </Button>
           </form>
 
           <p className="mt-4 text-center text-sm text-gray-500">
-            No password required. We'll send you a link to sign in.
+            No password needed — just a one-time link.
           </p>
         </div>
       </div>
