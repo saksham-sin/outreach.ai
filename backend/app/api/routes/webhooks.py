@@ -125,7 +125,6 @@ def _verify_resend_signature(headers: dict[str, str], body: bytes) -> None:
 async def resend_inbound(
     request: Request,
     session: SessionDep,
-    credentials: HTTPBasicCredentials | None = Depends(security),
 ) -> dict[str, str | bool]:
     reply_mode = (settings.REPLY_MODE or "SIMULATED").upper()
     if reply_mode != "RESEND-WEBHOOK":
