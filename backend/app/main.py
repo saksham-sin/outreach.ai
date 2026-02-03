@@ -110,9 +110,16 @@ app = FastAPI(
 cors_origins = []
 if settings.FRONTEND_URL:
     cors_origins = [settings.FRONTEND_URL]
+    
+    # Add additional frontend URLs if configured (comma-separated)
+    if settings.FRONTEND_URLS:
+        additional_urls = [url.strip() for url in settings.FRONTEND_URLS.split(",") if url.strip()]
+        cors_origins.extend(additional_urls)
 else:
     # Fallback for development - allow all
     cors_origins = ["*"]
+
+logger.info(f"CORS enabled for origins: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
