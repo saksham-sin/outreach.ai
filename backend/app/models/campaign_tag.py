@@ -16,7 +16,7 @@ class CampaignTag(SQLModel, table=True):
     __tablename__ = "campaign_tags"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    campaign_id: UUID = Field(foreign_key="campaigns.id", index=True)
+    campaign_id: UUID = Field(foreign_key="campaigns.id", index=True, ondelete="CASCADE")
     tag: str = Field(max_length=100, index=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

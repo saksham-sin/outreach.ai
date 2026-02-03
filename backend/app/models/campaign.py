@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from app.models.campaign_tag import CampaignTag
 
 
+CASCADE_DELETE_ORPHAN = "all, delete-orphan"
+
+
 class CampaignBase(SQLModel):
     """Base campaign fields."""
     
@@ -44,9 +47,18 @@ class Campaign(CampaignBase, table=True):
     )
 
     # Relationships
-    leads: list["Lead"] = Relationship(back_populates="campaign")
-    templates: list["EmailTemplate"] = Relationship(back_populates="campaign")
-    tags: list["CampaignTag"] = Relationship(back_populates="campaign")
+    leads: list["Lead"] = Relationship(
+        back_populates="campaign",
+        sa_relationship_kwargs={"cascade": CASCADE_DELETE_ORPHAN}
+    )
+    templates: list["EmailTemplate"] = Relationship(
+        back_populates="campaign",
+        sa_relationship_kwargs={"cascade": CASCADE_DELETE_ORPHAN}
+    )
+    tags: list["CampaignTag"] = Relationship(
+        back_populates="campaign",
+        sa_relationship_kwargs={"cascade": CASCADE_DELETE_ORPHAN}
+    )
 
 
 class CampaignCreate(CampaignBase):

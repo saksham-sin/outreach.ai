@@ -198,8 +198,6 @@ async def get_campaign(
             detail="Campaign not found",
         )
     
-    # Add tags to response
-    campaign.tags = [tag.tag for tag in campaign.tags] if hasattr(campaign, 'tags') else []
     return campaign
 
 

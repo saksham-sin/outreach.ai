@@ -24,6 +24,8 @@ from app.domain.enums import CampaignStatus, LeadStatus, JobStatus
 
 logger = logging.getLogger(__name__)
 
+CAMPAIGN_NOT_FOUND = "Campaign not found"
+
 
 class CampaignError(Exception):
     """Custom exception for campaign errors."""
@@ -209,7 +211,7 @@ class CampaignService:
         """
         campaign = await self.get_campaign(campaign_id, user_id)
         if not campaign:
-            raise CampaignError("Campaign not found")
+            raise CampaignError(CAMPAIGN_NOT_FOUND)
         
         if campaign.status != CampaignStatus.DRAFT:
             raise CampaignError("Campaign must be in DRAFT status to launch")
@@ -286,7 +288,7 @@ class CampaignService:
         """
         campaign = await self.get_campaign(campaign_id, user_id)
         if not campaign:
-            raise CampaignError("Campaign not found")
+            raise CampaignError(CAMPAIGN_NOT_FOUND)
         
         if not CampaignStatus.can_transition(campaign.status, CampaignStatus.PAUSED):
             raise CampaignError(
@@ -321,7 +323,7 @@ class CampaignService:
         """
         campaign = await self.get_campaign(campaign_id, user_id)
         if not campaign:
-            raise CampaignError("Campaign not found")
+            raise CampaignError(CAMPAIGN_NOT_FOUND)
         
         if campaign.status != CampaignStatus.PAUSED:
             raise CampaignError("Can only resume campaigns in PAUSED status")
@@ -356,7 +358,7 @@ class CampaignService:
         """
         original = await self.get_campaign(campaign_id, user_id)
         if not original:
-            raise CampaignError("Campaign not found")
+            raise CampaignError(CAMPAIGN_NOT_FOUND)
         
         # Create new campaign
         new_campaign = Campaign(
@@ -515,7 +517,7 @@ class CampaignService:
         # Verify campaign exists
         campaign = await self.get_campaign(campaign_id, user_id)
         if not campaign:
-            raise CampaignError("Campaign not found")
+            raise CampaignError(CAMPAIGN_NOT_FOUND)
         
         # Get earliest pending job for non-terminal leads
         result = await self.session.execute(
@@ -561,7 +563,7 @@ class CampaignService:
         """
         campaign = await self.get_campaign(campaign_id, user_id)
         if not campaign:
-            raise CampaignError("Campaign not found")
+            raise CampaignError(CAMPAIGN_NOT_FOUND)
         
         if campaign.status != CampaignStatus.DRAFT:
             raise CampaignError("Only DRAFT campaigns can be deleted")
@@ -622,7 +624,7 @@ class CampaignService:
         # Verify campaign ownership
         campaign = await self.get_campaign(campaign_id, user_id)
         if not campaign:
-            raise CampaignError("Campaign not found")
+            raise CampaignError(CAMPAIGN_NOT_FOUND)
         
         # Check if tag already exists
         result = await self.session.execute(
@@ -665,7 +667,7 @@ class CampaignService:
         # Verify campaign ownership
         campaign = await self.get_campaign(campaign_id, user_id)
         if not campaign:
-            raise CampaignError("Campaign not found")
+            raise CampaignError(CAMPAIGN_NOT_FOUND)
         
         # Find and delete the tag
         result = await self.session.execute(

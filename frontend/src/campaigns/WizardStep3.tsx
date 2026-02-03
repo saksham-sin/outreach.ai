@@ -47,8 +47,8 @@ export function WizardStep3() {
   }>({ open: false, subject: '', body: '', stepNumber: 1 });
   const [stepViewMode, setStepViewMode] = useState<Record<number, 'edit' | 'preview'>>({});
   
-  // Refs for TextArea elements to track cursor position
-  const textAreaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+  // Refs for RichTextEditor insert functions
+  const editorInsertRefs = useRef<Record<number, ((text: string) => void) | null>>({});
 
   // Fetch existing templates on mount
   useEffect(() => {
@@ -114,29 +114,19 @@ export function WizardStep3() {
       [stepNumber]: { ...(prev[stepNumber] || { subject: '', body: '' }), [field]: value },
     }));
   };
+  const stripHtml = (html: string) =>
+    html.replaceAll(/<[^>]*>/g, '').replaceAll('&nbsp;', ' ').trim();
 
   const insertPlaceholder = (stepNumber: number, placeholder: string) => {
-    const textArea = textAreaRefs.current[stepNumber];
-    if (!textArea) {
-      console.warn(`TextArea ref not found for step ${stepNumber}`);
-      return;
+    const insertFn = editorInsertRefs.current[stepNumber];
+    if (insertFn) {
+      // Use the editor's insert function
+      insertFn(placeholder);
+    } else {
+      // Fallback: append to the end
+      const draft = getDraft(stepNumber);
+      updateDraft(stepNumber, 'body', draft.body + placeholder);
     }
-
-    // Get current textarea content from drafts, not from the DOM
-    const currentValue = drafts[stepNumber]?.body || textArea.value || '';
-    const start = textArea.selectionStart || currentValue.length;
-    const end = textArea.selectionEnd || currentValue.length;
-    
-    const newValue = currentValue.substring(0, start) + placeholder + currentValue.substring(end);
-    updateDraft(stepNumber, 'body', newValue);
-    
-    // Restore focus and move cursor after the inserted text
-    setTimeout(() => {
-      if (textArea) {
-        textArea.focus();
-        textArea.setSelectionRange(start + placeholder.length, start + placeholder.length);
-      }
-    }, 0);
   };
 
   const upsertTemplate = (template: EmailTemplate) => {
@@ -158,13 +148,13 @@ export function WizardStep3() {
     stepNumber: number,
     subject: string,
     body: string
-  ): Promise<boolean> => {
-    if (!state.campaignId || isCreatingTemplate === stepNumber) return false;
+  ): Promise<EmailTemplate | null> => {
+    if (!state.campaignId || isCreatingTemplate === stepNumber) return null;
 
-    if (!subject.trim() || !body.trim()) return false;
+    if (!subject.trim() || !stripHtml(body)) return null;
 
     const existing = state.templates.find((t) => t.step_number === stepNumber);
-    if (existing) return false;
+    if (existing) return existing;
 
     setIsCreatingTemplate(stepNumber);
 
@@ -176,10 +166,10 @@ export function WizardStep3() {
         delay_days: 0,
       });
       upsertTemplate(created);
-      return true;
+      return created;
     } catch {
       // Error handled by API client
-      return false;
+      return null;
     } finally {
       setIsCreatingTemplate(null);
     }
@@ -285,20 +275,21 @@ export function WizardStep3() {
   const handleNext = async () => {
     if (!state.campaignId) return;
 
-    let createdAny = false;
+    const createdTemplates: EmailTemplate[] = [];
 
     for (const stepNumber of [1, 2, 3]) {
       const template = getTemplateForStep(stepNumber);
       if (template) continue;
 
       const draft = getDraft(stepNumber);
-      if (draft.subject.trim() && draft.body.trim()) {
+      if (draft.subject.trim() && stripHtml(draft.body)) {
         const created = await handleCreateTemplate(stepNumber, draft.subject, draft.body);
-        if (created) createdAny = true;
+        if (created) createdTemplates.push(created);
       }
     }
 
-    if (state.templates.length === 0 && !createdAny) {
+    const totalTemplates = state.templates.length + createdTemplates.length;
+    if (totalTemplates === 0) {
       toast.error('Please add at least one email template to continue.');
       return;
     }
@@ -412,76 +403,83 @@ export function WizardStep3() {
                       Remove
                     </Button>
                   )}
-                  {templatesMode === 'ai' && (
-                    <div className="flex gap-2">
-                      {template && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              if (!state.campaignId || !template) return;
-
-                              try {
-                                // Always persist current content before server preview
-                                await templatesApi.update(
-                                  state.campaignId,
-                                  template.id,
-                                  { subject: subjectValue, body: bodyValue }
-                                );
-                                updateTemplate(templateIndex, {
-                                  subject: subjectValue,
-                                  body: bodyValue,
-                                });
-                              } catch {
-                                // If save fails, show local draft preview
-                                setDraftPreviewModal({
-                                  open: true,
-                                  subject: subjectValue,
-                                  body: bodyValue,
-                                  stepNumber,
-                                });
-                                return;
-                              }
-
-                              setPreviewModal({
+                  <div className="flex gap-2">
+                    {(template || subjectValue.trim() || stripHtml(bodyValue)) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          if (template && state.campaignId) {
+                            try {
+                              // Always persist current content before server preview
+                              await templatesApi.update(
+                                state.campaignId,
+                                template.id,
+                                { subject: subjectValue, body: bodyValue }
+                              );
+                              updateTemplate(templateIndex, {
+                                subject: subjectValue,
+                                body: bodyValue,
+                              });
+                            } catch {
+                              setDraftPreviewModal({
                                 open: true,
-                                templateId: template.id,
+                                subject: subjectValue,
+                                body: bodyValue,
                                 stepNumber,
                               });
-                            }}
-                          >
-                            👁️ Preview
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setRewriteModal({
-                                open: true,
-                                index: templateIndex,
-                                instructions: '',
-                              })
+                              return;
                             }
-                            disabled={isRewriting === templateIndex}
-                          >
-                            Rewrite
-                          </Button>
-                        </>
-                      )}
-                      {!template && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleGenerateSingle(stepNumber)}
-                          isLoading={isGenerating === stepNumber}
-                          disabled={isGeneratingAll || (isGenerating !== null && isGenerating !== stepNumber)}
-                        >
-                          Generate
-                        </Button>
-                      )}
-                    </div>
-                  )}
+
+                            setPreviewModal({
+                              open: true,
+                              templateId: template.id,
+                              stepNumber,
+                            });
+                            return;
+                          }
+
+                          setDraftPreviewModal({
+                            open: true,
+                            subject: subjectValue,
+                            body: bodyValue,
+                            stepNumber,
+                          });
+                        }}
+                      >
+                        👁️ Preview
+                      </Button>
+                    )}
+
+                    {templatesMode === 'ai' && template && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setRewriteModal({
+                            open: true,
+                            index: templateIndex,
+                            instructions: '',
+                          })
+                        }
+                        disabled={isRewriting === templateIndex}
+                      >
+                        Rewrite
+                      </Button>
+                    )}
+
+                    {templatesMode === 'ai' && !template && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleGenerateSingle(stepNumber)}
+                        isLoading={isGenerating === stepNumber}
+                        disabled={isGeneratingAll || (isGenerating !== null && isGenerating !== stepNumber)}
+                      >
+                        Generate
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -546,6 +544,9 @@ export function WizardStep3() {
                           if (template) {
                             updateTemplate(templateIndex, { body: value });
                           }
+                        }}
+                        onEditorReady={(insertFn) => {
+                          editorInsertRefs.current[stepNumber] = insertFn;
                         }}
                         height="300px"
                       />
@@ -643,17 +644,17 @@ export function WizardStep3() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <div className="block text-xs font-medium text-gray-700 mb-1">
               Subject
-            </label>
+            </div>
             <div className="bg-gray-50 p-3 rounded border border-gray-200">
               <p className="text-gray-900">{draftPreviewModal.subject || '(No subject)'}</p>
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <div className="block text-xs font-medium text-gray-700 mb-1">
               Body
-            </label>
+            </div>
             <div className="bg-white p-4 rounded border border-gray-200 max-h-96 overflow-y-auto">
               {draftPreviewModal.body ? (
                 <VariableHighlightPreview htmlContent={draftPreviewModal.body} />

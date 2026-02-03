@@ -65,7 +65,8 @@ export const templatesApi = {
   ): Promise<EmailTemplate> => {
     const response = await apiClient.post<EmailTemplate>(
       `/campaigns/${campaignId}/templates/generate`,
-      { step_number: stepNumber }
+      { step_number: stepNumber },
+      { timeout: 30000 }
     );
     return response.data;
   },
@@ -79,7 +80,8 @@ export const templatesApi = {
   ): Promise<TemplateListResponse> => {
     const response = await apiClient.post<TemplateListResponse>(
       `/campaigns/${campaignId}/templates/generate-all`,
-      { num_steps: numSteps }
+      { num_steps: numSteps },
+      { timeout: 30000 }
     );
     return response.data;
   },

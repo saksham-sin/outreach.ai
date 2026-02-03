@@ -78,7 +78,7 @@ class EmailTemplate(EmailTemplateBase, table=True):
     __tablename__ = "email_templates"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    campaign_id: UUID = Field(foreign_key="campaigns.id", index=True)
+    campaign_id: UUID = Field(foreign_key="campaigns.id", index=True, ondelete="CASCADE")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False)

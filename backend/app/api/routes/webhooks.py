@@ -18,50 +18,49 @@ settings = get_settings()
 
 router = APIRouter(prefix="/webhooks/resend", tags=["Webhooks"])
 
+FIELDS_TO_SCAN = ("to", "reply_to", "replyTo", "from", "cc", "bcc")
+HEADER_FIELDS_TO_SCAN = {"reply-to", "to", "from"}
+
+
+def _add_candidate_value(candidates: list[str], value: Any) -> None:
+    if value is None:
+        return
+    if isinstance(value, list):
+        for item in value:
+            _add_candidate_value(candidates, item)
+        return
+    if isinstance(value, dict):
+        for item in value.values():
+            _add_candidate_value(candidates, item)
+        return
+    candidates.append(str(value))
+
+
+def _add_candidate_fields(candidates: list[str], container: Any) -> None:
+    if not isinstance(container, dict):
+        return
+    for field in FIELDS_TO_SCAN:
+        _add_candidate_value(candidates, container.get(field))
+
+
+def _add_candidate_headers(candidates: list[str], container: Any) -> None:
+    if not isinstance(container, list):
+        return
+    for header in container:
+        if not isinstance(header, dict):
+            continue
+        name = str(header.get("name", "")).lower()
+        if name in HEADER_FIELDS_TO_SCAN:
+            _add_candidate_value(candidates, header.get("value"))
+
 
 def _extract_candidate_strings(payload: dict[str, Any]) -> list[str]:
     """Extract all candidate strings from webhook payload that might contain lead ID."""
     candidates: list[str] = []
 
-    def add_value(value: Any) -> None:
-        if value is None:
-            return
-        if isinstance(value, list):
-            for item in value:
-                add_value(item)
-            return
-        if isinstance(value, dict):
-            for item in value.values():
-                add_value(item)
-            return
-        candidates.append(str(value))
-
-    # Check top-level fields
-    add_value(payload.get("to"))
-    add_value(payload.get("reply_to"))
-    add_value(payload.get("replyTo"))
-    add_value(payload.get("from"))
-    add_value(payload.get("cc"))
-    add_value(payload.get("bcc"))
-
-    # Check nested data field (Resend webhook format)
-    data = payload.get("data")
-    if isinstance(data, dict):
-        add_value(data.get("to"))
-        add_value(data.get("reply_to"))
-        add_value(data.get("replyTo"))
-        add_value(data.get("from"))
-        add_value(data.get("cc"))
-        add_value(data.get("bcc"))
-
-    headers = payload.get("headers")
-    if isinstance(headers, list):
-        for header in headers:
-            if not isinstance(header, dict):
-                continue
-            name = str(header.get("name", "")).lower()
-            if name in {"reply-to", "to", "from"}:
-                add_value(header.get("value"))
+    _add_candidate_fields(candidates, payload)
+    _add_candidate_fields(candidates, payload.get("data"))
+    _add_candidate_headers(candidates, payload.get("headers"))
 
     return candidates
 
