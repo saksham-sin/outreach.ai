@@ -294,8 +294,8 @@ async def delete_lead(
 @router.post(
     "/{lead_id}/mark-replied",
     response_model=MarkRepliedResponse,
-    summary="Mark lead as replied (simulated)",
-    description="Manually mark a lead as having replied. Only works when REPLY_MODE=simulated.",
+    summary="Mark lead as replied",
+    description="Manually mark a lead as having replied (simulated reply mode for demo).",
 )
 async def mark_lead_replied(
     campaign_id: UUID,
@@ -304,22 +304,12 @@ async def mark_lead_replied(
     current_user: CurrentUser,
 ) -> MarkRepliedResponse:
     """
-    Mark a lead as having replied (for simulated reply mode).
+    Mark a lead as having replied.
     
-    This endpoint allows manual marking of leads as replied when
-    webhook-based reply detection is not available (REPLY_MODE=simulated).
-    
-    Only works when REPLY_MODE is set to 'simulated'.
+    This endpoint allows manual marking of leads as replied.
+    Automatic webhook-based inbound reply detection deferred for scope discipline.
     Also cancels all pending follow-up emails for this lead.
     """
-    # Check if simulated reply mode is enabled
-    reply_mode = getattr(settings, 'REPLY_MODE', 'webhook')
-    if reply_mode != 'simulated':
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Manual reply marking is only available in simulated mode. Set REPLY_MODE=simulated to enable.",
-        )
-    
     service = LeadService(session)
     lead = await service.get_lead(lead_id, current_user.id)
     
