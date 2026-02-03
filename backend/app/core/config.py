@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     # App URLs
     APP_BASE_URL: str
     FRONTEND_URL: str
+    FRONTEND_URLS: str = ""  # Comma-separated list of additional frontend URLs for CORS
 
     # Worker Settings
     WORKER_POLL_INTERVAL_SECONDS: int = 5  # Check for pending emails every 5 seconds
