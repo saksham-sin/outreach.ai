@@ -20,6 +20,7 @@ router = APIRouter(prefix="/webhooks/resend", tags=["Webhooks"])
 
 
 def _extract_candidate_strings(payload: dict[str, Any]) -> list[str]:
+    """Extract all candidate strings from webhook payload that might contain lead ID."""
     candidates: list[str] = []
 
     def add_value(value: Any) -> None:
@@ -35,12 +36,23 @@ def _extract_candidate_strings(payload: dict[str, Any]) -> list[str]:
             return
         candidates.append(str(value))
 
+    # Check top-level fields
     add_value(payload.get("to"))
     add_value(payload.get("reply_to"))
     add_value(payload.get("replyTo"))
     add_value(payload.get("from"))
     add_value(payload.get("cc"))
     add_value(payload.get("bcc"))
+
+    # Check nested data field (Resend webhook format)
+    data = payload.get("data")
+    if isinstance(data, dict):
+        add_value(data.get("to"))
+        add_value(data.get("reply_to"))
+        add_value(data.get("replyTo"))
+        add_value(data.get("from"))
+        add_value(data.get("cc"))
+        add_value(data.get("bcc"))
 
     headers = payload.get("headers")
     if isinstance(headers, list):
@@ -55,17 +67,29 @@ def _extract_candidate_strings(payload: dict[str, Any]) -> list[str]:
 
 
 def _extract_lead_id(payload: dict[str, Any]) -> UUID | None:
+    """Extract lead ID from webhook payload.
+    
+    The lead ID is typically encoded in the recipient email address:
+    hello+<lead-id>@example.com
+    """
     candidates = _extract_candidate_strings(payload)
     uuid_pattern = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 
+    logger.debug(f"Searching for lead ID in {len(candidates)} candidate strings")
+    
     for value in candidates:
+        logger.debug(f"Checking candidate: {value}")
         match = uuid_pattern.search(value)
         if not match:
             continue
         try:
-            return UUID(match.group(0))
+            found_id = UUID(match.group(0))
+            logger.info(f"Found lead ID: {found_id}")
+            return found_id
         except ValueError:
             continue
+    
+    logger.error(f"No valid UUID found in candidates: {candidates}")
     return None
 
 

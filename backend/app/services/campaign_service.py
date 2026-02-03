@@ -480,7 +480,7 @@ class CampaignService:
                 EmailJob.campaign_id == campaign_id,
                 EmailJob.status == JobStatus.PENDING,
                 # Exclude jobs for leads that are in terminal state
-                Lead.status.not_in([LeadStatus.REPLIED, LeadStatus.FAILED]),
+                Lead.status.not_in([LeadStatus.COMPLETED, LeadStatus.REPLIED, LeadStatus.FAILED]),
             )
             .order_by(EmailJob.scheduled_at)
             .limit(1)
@@ -521,7 +521,7 @@ class CampaignService:
             .where(
                 EmailJob.campaign_id == campaign_id,
                 EmailJob.status == JobStatus.PENDING,
-                Lead.status.not_in([LeadStatus.REPLIED, LeadStatus.FAILED]),
+                Lead.status.not_in([LeadStatus.COMPLETED, LeadStatus.REPLIED, LeadStatus.FAILED]),
             )
             .order_by(EmailJob.scheduled_at)
             .limit(1)

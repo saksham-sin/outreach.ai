@@ -28,12 +28,13 @@ class LeadStatus(str, Enum):
     
     PENDING = "pending"       # Lead imported, not yet contacted
     CONTACTED = "contacted"   # At least one email sent
+    COMPLETED = "completed"   # All scheduled emails sent, no reply (terminal - no more follow-ups)
     REPLIED = "replied"       # Lead replied (terminal - stops follow-ups)
     FAILED = "failed"         # All send attempts failed (terminal)
 
     def is_terminal(self) -> bool:
         """Check if this is a terminal state."""
-        return self in {LeadStatus.REPLIED, LeadStatus.FAILED}
+        return self in {LeadStatus.COMPLETED, LeadStatus.REPLIED, LeadStatus.FAILED}
 
 
 class JobStatus(str, Enum):
