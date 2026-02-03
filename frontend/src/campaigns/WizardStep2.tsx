@@ -42,7 +42,7 @@ export function WizardStep2() {
     fetchCampaigns();
   }, [state.campaignId]);
 
-  // Fetch saved leads from database and add to state.leads
+  // Fetch saved leads from database
   useEffect(() => {
     const fetchSavedLeads = async () => {
       if (!state.campaignId) return;
@@ -50,18 +50,6 @@ export function WizardStep2() {
       try {
         const response = await leadsApi.list(state.campaignId, { limit: 100 });
         setSavedLeads(response.leads);
-        
-        // Only initialize state.leads with saved leads if state.leads is empty
-        // This preserves any leads that were just added
-        if (state.leads.length === 0 && response.leads.length > 0) {
-          const savedAsLeads: ParsedLead[] = response.leads.map((lead) => ({
-            email: lead.email,
-            first_name: lead.first_name || undefined,
-            company: lead.company || undefined,
-            isValid: true,
-          }));
-          setLeads(savedAsLeads);
-        }
       } catch (err) {
         console.error('Failed to fetch saved leads:', err);
       }
@@ -69,6 +57,20 @@ export function WizardStep2() {
 
     fetchSavedLeads();
   }, [state.campaignId]);
+
+  // Sync saved leads with state.leads whenever savedLeads change
+  // This ensures the preview always shows the latest from database
+  useEffect(() => {
+    if (savedLeads.length > 0) {
+      const savedAsLeads: ParsedLead[] = savedLeads.map((lead) => ({
+        email: lead.email,
+        first_name: lead.first_name || undefined,
+        company: lead.company || undefined,
+        isValid: true,
+      }));
+      setLeads(savedAsLeads);
+    }
+  }, [savedLeads]);
 
   const parseCSV = (file: File): Promise<ParsedLead[]> => {
     return new Promise((resolve, reject) => {

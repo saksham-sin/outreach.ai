@@ -122,6 +122,7 @@ class CampaignService:
             start_time=campaign.start_time,
             created_at=campaign.created_at,
             updated_at=campaign.updated_at,
+            tags=[tag.tag for tag in campaign.tags],
             total_leads=sum(status_counts.values()),
             pending_leads=status_counts.get(LeadStatus.PENDING, 0),
             contacted_leads=status_counts.get(LeadStatus.CONTACTED, 0),

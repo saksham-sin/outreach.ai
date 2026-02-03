@@ -89,6 +89,7 @@ async def create_campaign(
         start_time=campaign.start_time,
         created_at=campaign.created_at,
         updated_at=campaign.updated_at,
+        tags=[],
     )
 
 
@@ -164,6 +165,7 @@ async def list_campaigns(
                 start_time=c.start_time,
                 created_at=c.created_at,
                 updated_at=c.updated_at,
+                tags=[tag.tag for tag in c.tags],
             )
             for c in campaigns
         ],
@@ -196,6 +198,8 @@ async def get_campaign(
             detail="Campaign not found",
         )
     
+    # Add tags to response
+    campaign.tags = [tag.tag for tag in campaign.tags] if hasattr(campaign, 'tags') else []
     return campaign
 
 
@@ -237,6 +241,7 @@ async def update_campaign(
             start_time=campaign.start_time,
             created_at=campaign.created_at,
             updated_at=campaign.updated_at,
+            tags=[tag.tag for tag in campaign.tags],
         )
     except CampaignError as e:
         raise HTTPException(
@@ -286,6 +291,7 @@ async def launch_campaign(
             start_time=campaign.start_time,
             created_at=campaign.created_at,
             updated_at=campaign.updated_at,
+            tags=[tag.tag for tag in campaign.tags],
         )
     except CampaignError as e:
         raise HTTPException(
@@ -325,6 +331,7 @@ async def pause_campaign(
             start_time=campaign.start_time,
             created_at=campaign.created_at,
             updated_at=campaign.updated_at,
+            tags=[tag.tag for tag in campaign.tags],
         )
     except CampaignError as e:
         raise HTTPException(
@@ -364,6 +371,7 @@ async def resume_campaign(
             start_time=campaign.start_time,
             created_at=campaign.created_at,
             updated_at=campaign.updated_at,
+            tags=[tag.tag for tag in campaign.tags],
         )
     except CampaignError as e:
         raise HTTPException(
@@ -407,6 +415,7 @@ async def duplicate_campaign(
             start_time=campaign.start_time,
             created_at=campaign.created_at,
             updated_at=campaign.updated_at,
+            tags=[tag.tag for tag in campaign.tags],
         )
     except CampaignError as e:
         raise HTTPException(
