@@ -1,11 +1,10 @@
 """API dependencies - authentication, database sessions, etc."""
 
 from typing import Annotated
-import secrets
 import logging
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, HTTPBasic, HTTPBasicCredentials
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.database import get_session
@@ -18,9 +17,6 @@ settings = get_settings()
 
 # OAuth2 scheme for JWT bearer tokens
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)
-
-# HTTP Basic auth for webhooks
-http_basic = HTTPBasic(auto_error=False)
 
 # Database session dependency
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -90,49 +86,6 @@ async def get_current_user_optional(
         return None
 
 
-def verify_webhook_auth(
-    credentials: HTTPBasicCredentials | None = Depends(http_basic),
-) -> bool:
-    """
-    Verify HTTP Basic authentication for webhook endpoints.
-    
-    Args:
-        credentials: Basic auth credentials
-        
-    Returns:
-        True if authenticated
-        
-    Raises:
-        HTTPException: If credentials invalid
-    """
-    if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    
-    # Use constant-time comparison to prevent timing attacks
-    username_correct = secrets.compare_digest(
-        credentials.username.encode("utf8"),
-        settings.WEBHOOK_USERNAME.encode("utf8"),
-    )
-    password_correct = secrets.compare_digest(
-        credentials.password.encode("utf8"),
-        settings.WEBHOOK_PASSWORD.encode("utf8"),
-    )
-    
-    if not (username_correct and password_correct):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    
-    return True
-
-
 # Type aliases for dependency injection
 CurrentUser = Annotated[User, Depends(get_current_user)]
 OptionalUser = Annotated[User | None, Depends(get_current_user_optional)]
-WebhookAuth = Annotated[bool, Depends(verify_webhook_auth)]

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import Optional
 from uuid import UUID
 
+from app.core.constants import EmailType
+
 
 @dataclass
 class EmailMetadata:
@@ -36,6 +38,7 @@ class EmailProvider(ABC):
         track_opens: bool = True,
         track_links: bool = True,
         from_email: Optional[str] = None,
+        email_type: EmailType = EmailType.OUTREACH,
     ) -> EmailResult:
         """
         Send a campaign email with tracking and reply detection.
@@ -48,7 +51,8 @@ class EmailProvider(ABC):
             metadata: Campaign/lead tracking metadata
             track_opens: Whether to track email opens
             track_links: Whether to track link clicks
-            from_email: Optional custom from email (defaults to configured EMAIL_FROM_ADDRESS)
+            from_email: Optional custom from email (defaults to sender based on email_type)
+            email_type: Type of email (AUTH or OUTREACH) for sender routing
             
         Returns:
             EmailResult with success status and message ID
@@ -61,6 +65,7 @@ class EmailProvider(ABC):
         to_email: str,
         subject: str,
         body: str,
+        email_type: EmailType = EmailType.AUTH,
     ) -> EmailResult:
         """
         Send a simple transactional email (e.g., magic links).
@@ -69,6 +74,7 @@ class EmailProvider(ABC):
             to_email: Recipient email address
             subject: Email subject
             body: Plain text body
+            email_type: Type of email (AUTH or OUTREACH) for sender routing
             
         Returns:
             EmailResult with success status

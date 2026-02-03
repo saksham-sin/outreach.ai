@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import get_settings
+from app.core.constants import MAGIC_LINK_PATH, EmailType
 from app.core.prompts import MAGIC_LINK_EMAIL_SUBJECT, MAGIC_LINK_EMAIL_BODY
-from app.core.constants import MAGIC_LINK_PATH
 from app.models.user import User, UserCreate, UserRead, UserProfileUpdate
 from app.infrastructure.email_factory import get_email_provider
 from app.infrastructure.email_provider import EmailProviderError
@@ -200,6 +200,7 @@ class AuthService:
             to_email=email,
             subject=MAGIC_LINK_EMAIL_SUBJECT,
             body=body,
+            email_type=EmailType.AUTH,
         )
         
         if not result.success:

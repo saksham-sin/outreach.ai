@@ -20,6 +20,9 @@ from app.infrastructure.email_provider import EmailMetadata, EmailProviderError
 from app.core.constants import (
     RETRY_DELAYS_MINUTES,
     WORKER_BATCH_SIZE,
+    EmailType,
+    RETRY_DELAYS_MINUTES,
+    WORKER_BATCH_SIZE,
     MAX_CAMPAIGN_STEPS,
     TEMPLATE_PLACEHOLDERS,
 )
@@ -257,6 +260,7 @@ class JobService:
                 html_body=body,
                 metadata=metadata,
                 from_email=user_email_address,  # Pass dynamic user email (or None for default)
+                email_type=EmailType.OUTREACH,  # Campaign emails use OUTREACH sender
             )
         except Exception as e:
             # Catch any exceptions from provider (HTTP errors, timeout, etc.)
@@ -269,7 +273,7 @@ class JobService:
         # Success
         job.status = JobStatus.SENT
         job.sent_at = datetime.now(timezone.utc)
-        job.postmark_message_id = result.message_id
+        job.message_id = result.message_id
         job.updated_at = datetime.now(timezone.utc)
         
         # Update lead status
@@ -281,7 +285,7 @@ class JobService:
         
         logger.info(
             f"Job {job.id} sent successfully to {job.lead.email}, "
-            f"MessageID: {job.postmark_message_id}"
+            f"MessageID: {job.message_id}"
         )
         
         # Schedule next step if applicable

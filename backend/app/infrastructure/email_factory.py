@@ -1,13 +1,17 @@
-"""Factory for creating email provider instances based on configuration."""
+"""Factory for creating email provider instances.
+
+Note: Initially planned for multi-provider support (Postmark/Resend).
+Postmark implementation removed to reduce scope and avoid dead code.
+Resend is the sole production provider.
+"""
 
 from typing import Optional
 import logging
 
-from app.core.config import get_settings
 from app.infrastructure.email_provider import EmailProvider
+from app.infrastructure.resend_provider import ResendProvider
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 # Singleton provider instance
 _email_provider: Optional[EmailProvider] = None
@@ -15,31 +19,18 @@ _email_provider: Optional[EmailProvider] = None
 
 def get_email_provider() -> EmailProvider:
     """
-    Get the configured email provider instance.
-    
-    Returns provider based on EMAIL_PROVIDER env var:
-    - "resend": Returns ResendProvider
-    - "postmark": Returns PostmarkProvider (default)
+    Get the email provider instance (Resend).
     
     Returns:
-        EmailProvider instance
+        ResendProvider instance
     """
     global _email_provider
     
     if _email_provider is not None:
         return _email_provider
     
-    provider_name = getattr(settings, 'EMAIL_PROVIDER', 'postmark').lower()
-    
-    if provider_name == "resend":
-        from app.infrastructure.resend_provider import ResendProvider
-        _email_provider = ResendProvider()
-        logger.info("Using Resend email provider")
-    else:
-        # Default to Postmark
-        from app.infrastructure.postmark_provider import PostmarkProvider
-        _email_provider = PostmarkProvider()
-        logger.info("Using Postmark email provider")
+    _email_provider = ResendProvider()
+    logger.info("Using Resend email provider")
     
     return _email_provider
 

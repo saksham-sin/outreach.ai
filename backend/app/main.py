@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, campaigns, leads, templates, webhooks, jobs
+from app.api.routes import auth, campaigns, leads, templates, jobs
 from app.infrastructure.database import init_db, close_db
 from app.core.config import get_settings
 from app.services.worker import get_worker
@@ -27,27 +27,18 @@ def _validate_config() -> None:
     Logs warnings for missing optional config but allows app to start
     (supports demo scenarios with partial config).
     """
-    # Check email provider API keys
-    if settings.EMAIL_PROVIDER == "postmark":
-        if not settings.POSTMARK_SERVER_TOKEN:
-            logger.warning("POSTMARK_SERVER_TOKEN not set - email sending will fail")
-        if not settings.POSTMARK_INBOUND_ADDRESS:
-            logger.warning(
-                "POSTMARK_INBOUND_ADDRESS not set - reply detection disabled. "
-                "Set this to enable webhook-based reply detection."
-            )
-    elif settings.EMAIL_PROVIDER == "resend":
-        if not settings.RESEND_API_KEY:
-            logger.warning("RESEND_API_KEY not set - email sending will fail")
-        if not settings.RESEND_FROM_DOMAIN:
-            logger.warning("RESEND_FROM_DOMAIN not set - may cause issues with email sending")
+    # Check Resend email provider API keys
+    if not settings.RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set - email sending will fail")
+    if not settings.RESEND_FROM_DOMAIN:
+        logger.warning("RESEND_FROM_DOMAIN not set - may cause issues with email sending")
     
     # Check OpenAI config
     if not settings.OPENAI_API_KEY:
         logger.warning("OPENAI_API_KEY not set - AI email generation will fail")
     
-    # Check webhook security
-    if not settings.WEBHOOK_USERNAME or not settings.WEBHOOK_PASSWORD:
+    # Note: Webhook-based inbound email handling (reply detection) deferred.
+    # Using simulated reply mode via manual API for demo scope discipline.
         logger.warning(
             "WEBHOOK_USERNAME or WEBHOOK_PASSWORD not set - "
             "webhook endpoints will not be protected"
@@ -123,7 +114,6 @@ app.include_router(campaigns.router, prefix="/api")
 app.include_router(leads.router, prefix="/api")
 app.include_router(templates.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
-app.include_router(webhooks.router, prefix="/api")
 
 
 @app.get("/", tags=["Health"])

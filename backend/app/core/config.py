@@ -20,31 +20,27 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-5-mini"
 
-    # Email Provider Selection
-    EMAIL_PROVIDER: str = "postmark"  # "postmark" or "resend"
-    EMAIL_FROM_ADDRESS: str = ""  # Unified from address (falls back to FROM_EMAIL)
-    EMAIL_FROM_NAME: str = "Outreach AI"  # Unified from name
+    # Email Sender Configuration (Dual Sender Identity)
+    # AUTH emails: Magic links, transactional (no-reply)
+    EMAIL_AUTH_FROM_ADDRESS: str = ""  # e.g., no-reply@example.com
+    EMAIL_AUTH_FROM_NAME: str = "Outreach AI"
     
-    # Postmark (used when EMAIL_PROVIDER=postmark)
-    POSTMARK_SERVER_TOKEN: str = ""
-    POSTMARK_INBOUND_ADDRESS: str = ""
-    FROM_EMAIL: str = ""  # Legacy, use EMAIL_FROM_ADDRESS instead
-    FROM_NAME: str = "Outreach AI"  # Legacy, use EMAIL_FROM_NAME instead
+    # OUTREACH emails: Campaign and follow-ups (replies expected)
+    EMAIL_OUTREACH_FROM_ADDRESS: str = ""  # e.g., hello@example.com
+    EMAIL_OUTREACH_FROM_NAME: str = "Outreach AI"
+    EMAIL_OUTREACH_REPLY_TO: str = ""  # e.g., hello@example.com (same as from)
     
-    # Resend (used when EMAIL_PROVIDER=resend)
+    # Legacy unified email settings (deprecated - use specific AUTH/OUTREACH settings above)
+    EMAIL_FROM_ADDRESS: str = ""  # Fallback for backwards compatibility
+    EMAIL_FROM_NAME: str = "Outreach AI"  # Fallback for backwards compatibility
+    
+    # Resend Email Provider (sole production provider)
     RESEND_API_KEY: str = ""
     RESEND_FROM_DOMAIN: str = ""  # Custom domain for sending emails
-    
-    # Reply Mode
-    REPLY_MODE: str = "webhook"  # "webhook" or "simulated"
 
     # App URLs
     APP_BASE_URL: str
     FRONTEND_URL: str
-
-    # Webhook Security
-    WEBHOOK_USERNAME: str = ""
-    WEBHOOK_PASSWORD: str = ""
 
     # Worker Settings
     WORKER_POLL_INTERVAL_SECONDS: int = 5  # Check for pending emails every 5 seconds

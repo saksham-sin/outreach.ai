@@ -37,7 +37,7 @@ class EmailJob(EmailJobBase, table=True):
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    postmark_message_id: Optional[str] = Field(default=None, max_length=255)
+    message_id: Optional[str] = Field(default=None, max_length=255)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False)
@@ -70,6 +70,6 @@ class EmailJobRead(EmailJobBase):
     attempts: int
     last_error: Optional[str]
     sent_at: Optional[datetime]
-    postmark_message_id: Optional[str]
+    message_id: Optional[str]
     created_at: datetime
     updated_at: datetime

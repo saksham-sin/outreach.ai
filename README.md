@@ -130,15 +130,21 @@ Create `.env` file in `backend/` directory with these variables:
 DATABASE_URL=postgresql://user:password@localhost:5432/outreach_ai
 
 # Security
-SECRET_KEY=generate-with-openssl-rand-hex-32
+SECRET_KEY=your-secret-key-here
 
 # OpenAI
-OPENAI_API_KEY=sk-...your-key...
+OPENAI_API_KEY=sk-your-key-here
 
-# Email Provider (choose one: postmark or resend)
-EMAIL_PROVIDER=postmark
-POSTMARK_SERVER_TOKEN=...
-POSTMARK_INBOUND_ADDRESS=...
+# Email (Resend)
+RESEND_API_KEY=re_your_key_here
+RESEND_FROM_DOMAIN=example.com
+
+# Dual Sender Configuration
+EMAIL_AUTH_FROM_ADDRESS=no-reply@example.com
+EMAIL_AUTH_FROM_NAME=Your App Name
+EMAIL_OUTREACH_FROM_ADDRESS=hello@example.com
+EMAIL_OUTREACH_FROM_NAME=Your App Name
+EMAIL_OUTREACH_REPLY_TO=hello@example.com
 
 # URLs
 APP_BASE_URL=http://localhost:8000
