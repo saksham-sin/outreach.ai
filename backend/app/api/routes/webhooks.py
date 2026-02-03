@@ -2,14 +2,12 @@
 
 import logging
 import re
-import secrets
-import hmac
-import hashlib
 import json
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
+from svix.webhooks import Webhook, WebhookVerificationError
 
 from app.api.dependencies import SessionDep
 from app.core.config import get_settings
@@ -72,53 +70,33 @@ def _extract_lead_id(payload: dict[str, Any]) -> UUID | None:
 
 
 def _verify_resend_signature(headers: dict[str, str], body: bytes) -> None:
+    """Verify Resend webhook signature using Svix library.
+    
+    Resend uses Svix-style webhook signing with headers:
+    - svix-id: Message ID
+    - svix-timestamp: Timestamp of message
+    - svix-signature: Signature in format "v1,signature_value"
+    """
     secret = settings.RESEND_WEBHOOK_SECRET
     if not secret:
+        logger.warning("RESEND_WEBHOOK_SECRET not set - webhook signature verification disabled")
         return
 
-    signature_header = headers.get("resend-signature") or headers.get("Resend-Signature")
-    timestamp_header = headers.get("resend-timestamp") or headers.get("Resend-Timestamp")
-
-    # Support svix-style headers if provided
-    if not signature_header:
-        signature_header = headers.get("svix-signature") or headers.get("Svix-Signature")
-    if not timestamp_header:
-        timestamp_header = headers.get("svix-timestamp") or headers.get("Svix-Timestamp")
-
-    if signature_header and timestamp_header:
-        timestamp = timestamp_header.strip()
-        signatures = [sig.strip() for sig in signature_header.split(",") if sig.strip()]
-        digest = hmac.new(
-            secret.encode("utf-8"),
-            msg=f"{timestamp}.{body.decode('utf-8')}".encode("utf-8"),
-            digestmod=hashlib.sha256,
-        ).hexdigest()
-        if any(secrets.compare_digest(digest, sig.split("=")[-1]) for sig in signatures):
-            return
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature")
-
-    # Support resend-signature format: t=...,v1=...
-    if signature_header:
-        parts = {}
-        for piece in signature_header.split(","):
-            if "=" not in piece:
-                continue
-            key, value = piece.strip().split("=", 1)
-            parts[key] = value
-        timestamp = parts.get("t")
-        v1 = parts.get("v1")
-        if not timestamp or not v1:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature")
-        digest = hmac.new(
-            secret.encode("utf-8"),
-            msg=f"{timestamp}.{body.decode('utf-8')}".encode("utf-8"),
-            digestmod=hashlib.sha256,
-        ).hexdigest()
-        if not secrets.compare_digest(digest, v1):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature")
-        return
-
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing signature")
+    try:
+        # Use Svix library to verify the webhook
+        wh = Webhook(secret)
+        
+        # Convert body to string if it's bytes
+        payload_str = body.decode('utf-8') if isinstance(body, bytes) else body
+        
+        # Verify the webhook - this will raise WebhookVerificationError if invalid
+        wh.verify(payload_str, headers)
+        logger.debug("Webhook signature verified successfully")
+        
+    except WebhookVerificationError as e:
+        logger.error(f"Webhook signature verification failed: {str(e)}")
+        logger.debug(f"Headers: {dict(headers)}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook signature")
 
 
 @router.post("/inbound", summary="Handle Resend inbound reply")
@@ -128,12 +106,14 @@ async def resend_inbound(
 ) -> dict[str, str | bool]:
     reply_mode = (settings.REPLY_MODE or "SIMULATED").upper()
     if reply_mode != "RESEND-WEBHOOK":
+        logger.info("Reply mode is not RESEND-WEBHOOK; inbound webhook ignored")
         return {
             "success": False,
             "message": "Reply mode is not RESEND-WEBHOOK; inbound ignored",
         }
 
     body = await request.body()
+    logger.info("Received webhook request")
     _verify_resend_signature(dict(request.headers), body)
 
     payload = json.loads(body.decode("utf-8") or "{}")
