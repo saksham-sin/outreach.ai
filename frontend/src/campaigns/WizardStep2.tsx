@@ -26,6 +26,27 @@ export function WizardStep2() {
   const [savedLeads, setSavedLeads] = useState<Lead[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const mapSavedLeadsToParsed = (leads: Lead[]): ParsedLead[] =>
+    leads.map((lead) => ({
+      email: lead.email,
+      first_name: lead.first_name || undefined,
+      company: lead.company || undefined,
+      isValid: true,
+    }));
+
+  const syncSavedLeads = (leads: Lead[]) => {
+    setSavedLeads(leads);
+    setLeads(mapSavedLeadsToParsed(leads));
+  };
+
+  const refreshSavedLeads = async (): Promise<Lead[]> => {
+    if (!state.campaignId) return [];
+
+    const response = await leadsApi.list(state.campaignId, { limit: 100 });
+    syncSavedLeads(response.leads);
+    return response.leads;
+  };
+
   // Fetch existing campaigns for copy option
   useEffect(() => {
     const fetchCampaigns = async () => {
@@ -42,7 +63,7 @@ export function WizardStep2() {
     fetchCampaigns();
   }, [state.campaignId]);
 
-  // Fetch saved leads from database and add to state.leads
+  // Fetch saved leads from database
   useEffect(() => {
     const fetchSavedLeads = async () => {
       if (!state.campaignId) return;
@@ -50,18 +71,6 @@ export function WizardStep2() {
       try {
         const response = await leadsApi.list(state.campaignId, { limit: 100 });
         setSavedLeads(response.leads);
-        
-        // Only initialize state.leads with saved leads if state.leads is empty
-        // This preserves any leads that were just added
-        if (state.leads.length === 0 && response.leads.length > 0) {
-          const savedAsLeads: ParsedLead[] = response.leads.map((lead) => ({
-            email: lead.email,
-            first_name: lead.first_name || undefined,
-            company: lead.company || undefined,
-            isValid: true,
-          }));
-          setLeads(savedAsLeads);
-        }
       } catch (err) {
         console.error('Failed to fetch saved leads:', err);
       }
@@ -69,6 +78,14 @@ export function WizardStep2() {
 
     fetchSavedLeads();
   }, [state.campaignId]);
+
+  // Sync saved leads with state.leads whenever savedLeads change
+  // This ensures the preview always shows the latest from database
+  useEffect(() => {
+    if (savedLeads.length > 0) {
+      setLeads(mapSavedLeadsToParsed(savedLeads));
+    }
+  }, [savedLeads]);
 
   const parseCSV = (file: File): Promise<ParsedLead[]> => {
     return new Promise((resolve, reject) => {
@@ -142,6 +159,94 @@ export function WizardStep2() {
     }
   };
 
+  const persistPreviewLeads = async (existingLeads: Lead[]) => {
+    if (!state.campaignId) return;
+
+    const existingEmails = new Set(existingLeads.map((l) => normalizeEmail(l.email)));
+    const pendingPreviewLeads = state.leads.filter(
+      (lead) => lead.isValid && !existingEmails.has(normalizeEmail(lead.email))
+    );
+
+    if (pendingPreviewLeads.length === 0) {
+      return;
+    }
+
+    for (const lead of pendingPreviewLeads) {
+      try {
+        await leadsApi.create(state.campaignId, {
+          email: lead.email,
+          first_name: lead.first_name,
+          company: lead.company,
+        });
+      } catch (err) {
+        console.warn(`Failed to save lead ${lead.email}:`, err);
+      }
+    }
+
+    await refreshSavedLeads();
+  };
+
+  const handleCsvImport = async () => {
+    if (!state.campaignId || !csvFile) return;
+
+    setIsUploading(true);
+
+    try {
+      const result = await leadsApi.importCsv(state.campaignId, csvFile);
+      toast.success(`Imported ${result.imported} leads`);
+
+      if (result.errors.length > 0) {
+        console.warn('Import errors:', result.errors);
+      }
+
+      const saved = await refreshSavedLeads();
+      await persistPreviewLeads(saved);
+
+      setCsvFile(null);
+      nextStep();
+    } catch {
+      // Error handled by API client
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleManualSave = async () => {
+    if (!state.campaignId) return;
+
+    setIsUploading(true);
+
+    try {
+      const newLeads = state.leads.slice(savedLeads.length).filter((l) => l.isValid);
+      let savedCount = 0;
+
+      for (const lead of newLeads) {
+        try {
+          await leadsApi.create(state.campaignId, {
+            email: lead.email,
+            first_name: lead.first_name,
+            company: lead.company,
+          });
+          savedCount += 1;
+        } catch (err) {
+          console.warn(`Failed to save lead ${lead.email}:`, err);
+        }
+      }
+
+      if (savedCount > 0) {
+        toast.success(`Saved ${savedCount} lead${savedCount === 1 ? '' : 's'}`);
+      }
+
+      await refreshSavedLeads();
+      nextStep();
+    } catch {
+      // Error handled by API client
+      toast.error('Failed to save leads');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleUploadAndContinue = async () => {
     if (!state.campaignId) return;
 
@@ -154,112 +259,23 @@ export function WizardStep2() {
       return;
     }
 
-    // Only upload CSV if we're using CSV import method and have a file
-    if (importMethod === 'csv' && csvFile) {
-      setIsUploading(true);
-
-      try {
-        const result = await leadsApi.importCsv(state.campaignId, csvFile);
-        toast.success(`Imported ${result.imported} leads`);
-
-        if (result.errors.length > 0) {
-          console.warn('Import errors:', result.errors);
-        }
-
-        // Refresh saved leads after import
-        const response = await leadsApi.list(state.campaignId, { limit: 100 });
-        setSavedLeads(response.leads);
-
-        // Persist any preview-added leads that aren't in the CSV upload
-        const existingEmails = new Set(response.leads.map((l) => normalizeEmail(l.email)));
-        const pendingPreviewLeads = state.leads.filter(
-          (lead) => lead.isValid && !existingEmails.has(normalizeEmail(lead.email))
-        );
-
-        if (pendingPreviewLeads.length > 0) {
-          for (const lead of pendingPreviewLeads) {
-            try {
-              await leadsApi.create(state.campaignId, {
-                email: lead.email,
-                first_name: lead.first_name,
-                company: lead.company,
-              });
-            } catch (err) {
-              console.warn(`Failed to save lead ${lead.email}:`, err);
-            }
-          }
-
-          const refreshed = await leadsApi.list(state.campaignId, { limit: 100 });
-          setSavedLeads(refreshed.leads);
-          setLeads(refreshed.leads.map((lead) => ({
-            email: lead.email,
-            first_name: lead.first_name || undefined,
-            company: lead.company || undefined,
-            isValid: true,
-          })));
-        } else {
-          setLeads(response.leads.map((lead) => ({
-            email: lead.email,
-            first_name: lead.first_name || undefined,
-            company: lead.company || undefined,
-            isValid: true,
-          })));
-        }
-        
-        setCsvFile(null);
-        nextStep();
-      } catch {
-        // Error handled by API client
-      } finally {
-        setIsUploading(false);
+    if (importMethod === 'csv') {
+      if (!csvFile) {
+        toast.error('Please select a CSV file');
+        return;
       }
-    } else if (importMethod === 'manual') {
-      // For manual method, save all NEW valid leads to database
-      setIsUploading(true);
 
-      try {
-        // Only save the new leads (those not in savedLeads)
-        const newLeads = state.leads.slice(savedLeads.length).filter((l) => l.isValid);
-        let savedCount = 0;
+      await handleCsvImport();
+      return;
+    }
 
-        for (const lead of newLeads) {
-          try {
-            await leadsApi.create(state.campaignId, {
-              email: lead.email,
-              first_name: lead.first_name,
-              company: lead.company,
-            });
-            savedCount++;
-          } catch (err) {
-            console.warn(`Failed to save lead ${lead.email}:`, err);
-          }
-        }
+    if (importMethod === 'manual') {
+      await handleManualSave();
+      return;
+    }
 
-        if (savedCount > 0) {
-          toast.success(`Saved ${savedCount} lead${savedCount !== 1 ? 's' : ''}`);
-        }
-        
-        // Refresh saved leads after saving
-        const response = await leadsApi.list(state.campaignId, { limit: 100 });
-        setSavedLeads(response.leads);
-        setLeads(response.leads.map((lead) => ({
-          email: lead.email,
-          first_name: lead.first_name || undefined,
-          company: lead.company || undefined,
-          isValid: true,
-        })));
-        nextStep();
-      } catch {
-        // Error handled by API client
-        toast.error('Failed to save leads');
-      } finally {
-        setIsUploading(false);
-      }
-    } else if (importMethod === 'copy') {
-      // For copy method, leads are already saved, just proceed
+    if (importMethod === 'copy') {
       nextStep();
-    } else if (importMethod === 'csv') {
-      toast.error('Please select a CSV file');
     }
   };
 
@@ -301,22 +317,9 @@ export function WizardStep2() {
     toast.success('Lead added');
   };
 
-  const handleRemoveLead = async (index: number, isSaved: boolean, leadId?: string) => {
-    if (isSaved && leadId && state.campaignId) {
-      // Delete from database
-      try {
-        await leadsApi.delete(state.campaignId, leadId);
-        setSavedLeads(savedLeads.filter((l) => l.id !== leadId));
-        toast.success('Lead deleted');
-      } catch (err) {
-        console.error('Failed to delete lead:', err);
-        toast.error('Failed to delete lead');
-      }
-    } else {
-      // Remove from local preview state
-      setLeads(state.leads.filter((_, i) => i !== index));
-      toast.success('Lead removed');
-    }
+  const handleRemovePreviewLead = (index: number) => {
+    setLeads(state.leads.filter((_, i) => i !== index));
+    toast.success('Lead removed');
   };
 
   const handleAddLeadToPreview = () => {
@@ -441,11 +444,12 @@ export function WizardStep2() {
             </div>
           ) : (
             <>
-              <label className="block text-sm font-medium text-gray-700">
+              <label htmlFor="copy-campaign" className="block text-sm font-medium text-gray-700">
                 Select a campaign to copy leads from
               </label>
               <div className="flex gap-3">
                 <select
+                  id="copy-campaign"
                   value={selectedCampaignId}
                   onChange={(e) => setSelectedCampaignId(e.target.value)}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -475,10 +479,11 @@ export function WizardStep2() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="manual-lead-email" className="block text-sm font-medium text-gray-700 mb-1">
                 Email <span className="text-red-500">*</span>
               </label>
               <input
+                id="manual-lead-email"
                 type="email"
                 value={manualLead.email}
                 onChange={(e) => setManualLead({ ...manualLead, email: e.target.value })}
@@ -487,10 +492,11 @@ export function WizardStep2() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="manual-lead-first-name" className="block text-sm font-medium text-gray-700 mb-1">
                 First Name
               </label>
               <input
+                id="manual-lead-first-name"
                 type="text"
                 value={manualLead.first_name}
                 onChange={(e) => setManualLead({ ...manualLead, first_name: e.target.value })}
@@ -499,10 +505,11 @@ export function WizardStep2() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="manual-lead-company" className="block text-sm font-medium text-gray-700 mb-1">
                 Company
               </label>
               <input
+                id="manual-lead-company"
                 type="text"
                 value={manualLead.company}
                 onChange={(e) => setManualLead({ ...manualLead, company: e.target.value })}
@@ -561,7 +568,7 @@ export function WizardStep2() {
                 {/* Show unsaved leads from state */}
                 {state.leads.map((lead, index) => (
                   <tr
-                    key={`unsaved-${index}`}
+                    key={`unsaved-${normalizeEmail(lead.email || '')}-${lead.first_name || ''}-${lead.company || ''}`}
                     className={lead.isValid ? 'bg-white' : 'bg-red-50'}
                   >
                     <td className="px-4 py-2 text-sm text-gray-900">
@@ -582,7 +589,7 @@ export function WizardStep2() {
                     </td>
                     <td className="px-4 py-2 text-center">
                       <button
-                        onClick={() => handleRemoveLead(index, false)}
+                        onClick={() => handleRemovePreviewLead(index)}
                         className="text-red-600 hover:text-red-700 p-1"
                         title="Remove lead"
                       >
@@ -622,10 +629,11 @@ export function WizardStep2() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="preview-lead-email" className="block text-sm font-medium text-gray-700 mb-1">
                   Email <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="preview-lead-email"
                   type="email"
                   value={newLead.email}
                   onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
@@ -636,10 +644,11 @@ export function WizardStep2() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="preview-lead-first-name" className="block text-sm font-medium text-gray-700 mb-1">
                   First Name
                 </label>
                 <input
+                  id="preview-lead-first-name"
                   type="text"
                   value={newLead.first_name}
                   onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })}
@@ -649,10 +658,11 @@ export function WizardStep2() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="preview-lead-company" className="block text-sm font-medium text-gray-700 mb-1">
                   Company
                 </label>
                 <input
+                  id="preview-lead-company"
                   type="text"
                   value={newLead.company}
                   onChange={(e) => setNewLead({ ...newLead, company: e.target.value })}

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "react-datepicker": "^9.1.0",
     "tailwindcss-mcp-server": "^0.1.1"
   }

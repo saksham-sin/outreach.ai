@@ -8,12 +8,14 @@ interface RichTextEditorProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly height?: string;
+  readonly onEditorReady?: (insertText: (text: string) => void) => void;
 }
 
 export function RichTextEditor({
   value,
   onChange,
   height = '300px',
+  onEditorReady,
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -49,6 +51,15 @@ export function RichTextEditor({
       editor.commands.setContent(value);
     }
   }, [value, editor]);
+
+  // Expose insertText function when editor is ready
+  useEffect(() => {
+    if (editor && onEditorReady) {
+      onEditorReady((text: string) => {
+        editor.chain().focus().insertContent(text).run();
+      });
+    }
+  }, [editor, onEditorReady]);
 
   if (!editor) {
     return <div>Loading editor...</div>;

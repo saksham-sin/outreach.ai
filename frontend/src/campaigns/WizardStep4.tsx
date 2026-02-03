@@ -289,7 +289,9 @@ export function WizardStep4() {
                         <span className="text-xs text-gray-500 mt-1 font-medium">Minutes</span>
                       </div>
                     </div>
-                    <span className="text-sm text-gray-600 font-medium">of initial email</span>
+                    <span className="text-sm text-gray-600 font-medium">
+                      {template.step_number === 2 ? 'of initial email' : 'of previous email'}
+                    </span>
                     <Button
                       variant="ghost"
                       size="sm"

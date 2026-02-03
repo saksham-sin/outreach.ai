@@ -27,7 +27,7 @@ class Lead(LeadBase, table=True):
     __tablename__ = "leads"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    campaign_id: UUID = Field(foreign_key="campaigns.id", index=True)
+    campaign_id: UUID = Field(foreign_key="campaigns.id", index=True, ondelete="CASCADE")
     status: LeadStatus = Field(default=LeadStatus.PENDING, index=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -40,7 +40,10 @@ class Lead(LeadBase, table=True):
 
     # Relationships
     campaign: "Campaign" = Relationship(back_populates="leads")
-    jobs: list["EmailJob"] = Relationship(back_populates="lead")
+    jobs: list["EmailJob"] = Relationship(
+        back_populates="lead",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 
 class LeadCreate(LeadBase):

@@ -25,8 +25,8 @@ class EmailJob(EmailJobBase, table=True):
     __tablename__ = "email_jobs"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    campaign_id: UUID = Field(foreign_key="campaigns.id", index=True)
-    lead_id: UUID = Field(foreign_key="leads.id", index=True)
+    campaign_id: UUID = Field(foreign_key="campaigns.id", index=True, ondelete="CASCADE")
+    lead_id: UUID = Field(foreign_key="leads.id", index=True, ondelete="CASCADE")
     status: JobStatus = Field(default=JobStatus.PENDING, index=True)
     scheduled_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True)

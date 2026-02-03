@@ -171,80 +171,34 @@ class JobService:
         if not is_valid:
             # If campaign is paused or not active, keep job pending for resume
             if reason.startswith("Campaign is not active"):
-                job.last_error = reason
-                job.updated_at = datetime.now(timezone.utc)
-                job.scheduled_at = datetime.now(timezone.utc) + timedelta(
-                    seconds=settings.WORKER_POLL_INTERVAL_SECONDS
-                )
-                await self.session.flush()
-                logger.info(f"Job {job.id} deferred: {reason}")
-                return False
+                return await self._defer_job(job, reason)
 
-            job.status = JobStatus.SKIPPED
-            job.last_error = reason
-            job.updated_at = datetime.now(timezone.utc)
-            await self.session.flush()
-            
-            logger.info(f"Job {job.id} skipped: {reason}")
-            return False
+            return await self._skip_job(job, reason, f"Job {job.id} skipped: {reason}")
         
         # Get template
-        result = await self.session.execute(
-            select(EmailTemplate)
-            .where(
-                EmailTemplate.campaign_id == job.campaign_id,
-                EmailTemplate.step_number == job.step_number,
-            )
-        )
-        template = result.scalar_one_or_none()
+        template = await self._get_template_for_job(job)
         
         if not template:
-            job.status = JobStatus.FAILED
-            job.last_error = f"Template not found for step {job.step_number}"
-            job.updated_at = datetime.now(timezone.utc)
-            await self.session.flush()
-            
-            logger.error(f"Job {job.id} failed: template not found")
-            return False
+            return await self._fail_job_missing_template(job)
         
         # Substitute placeholders
         subject = self._substitute_placeholders(template.subject, job.lead)
         body = self._substitute_placeholders(template.body, job.lead)
         
         # Fetch campaign to get user_id
-        campaign_result = await self.session.execute(
-            select(Campaign).where(Campaign.id == job.campaign_id)
-        )
-        campaign = campaign_result.scalar_one_or_none()
+        campaign = await self._get_campaign_for_job(job.campaign_id)
         
         # Default user-specific email (will use fallback if user has no first_name)
-        user_email_address = None
-        
-        # Append user signature if available
-        if campaign:
-            user_result = await self.session.execute(
-                select(User).where(User.id == campaign.user_id)
-            )
-            user = user_result.scalar_one_or_none()
-            
-            if user:
-                if user.email_signature:
-                    # Append signature with spacing
-                    body = f"{body}<br><br>{user.email_signature}"
-                
-                # Generate user-specific email from their first_name (with fallback)
-                if user.first_name:
-                    user_email_address = get_user_email(user.first_name)
+        body, user_email_address = await self._apply_user_signature(body, campaign)
         # Second validation right before send to catch reply/state changes
         # (closes race between first validation and actual send)
         is_valid_final, reason_final = await self._validate_job_for_execution(job)
         if not is_valid_final:
-            job.status = JobStatus.SKIPPED
-            job.last_error = reason_final
-            job.updated_at = datetime.now(timezone.utc)
-            await self.session.flush()
-            logger.info(f"Job {job.id} skipped at final validation: {reason_final}")
-            return False
+            return await self._skip_job(
+                job,
+                reason_final,
+                f"Job {job.id} skipped at final validation: {reason_final}",
+            )
         
         metadata = EmailMetadata(
             campaign_id=job.campaign_id,
@@ -292,6 +246,74 @@ class JobService:
         await self._schedule_next_step(job)
         
         return True
+
+    async def _defer_job(self, job: EmailJob, reason: str) -> bool:
+        job.last_error = reason
+        job.updated_at = datetime.now(timezone.utc)
+        job.scheduled_at = datetime.now(timezone.utc) + timedelta(
+            seconds=settings.WORKER_POLL_INTERVAL_SECONDS
+        )
+        await self.session.flush()
+        logger.info(f"Job {job.id} deferred: {reason}")
+        return False
+
+    async def _skip_job(self, job: EmailJob, reason: str, log_message: str) -> bool:
+        job.status = JobStatus.SKIPPED
+        job.last_error = reason
+        job.updated_at = datetime.now(timezone.utc)
+        await self.session.flush()
+        logger.info(log_message)
+        return False
+
+    async def _get_template_for_job(self, job: EmailJob) -> Optional[EmailTemplate]:
+        result = await self.session.execute(
+            select(EmailTemplate)
+            .where(
+                EmailTemplate.campaign_id == job.campaign_id,
+                EmailTemplate.step_number == job.step_number,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def _fail_job_missing_template(self, job: EmailJob) -> bool:
+        job.status = JobStatus.FAILED
+        job.last_error = f"Template not found for step {job.step_number}"
+        job.updated_at = datetime.now(timezone.utc)
+        await self.session.flush()
+        logger.error(f"Job {job.id} failed: template not found")
+        return False
+
+    async def _get_campaign_for_job(self, campaign_id: UUID) -> Optional[Campaign]:
+        campaign_result = await self.session.execute(
+            select(Campaign).where(Campaign.id == campaign_id)
+        )
+        return campaign_result.scalar_one_or_none()
+
+    async def _apply_user_signature(
+        self,
+        body: str,
+        campaign: Optional[Campaign],
+    ) -> tuple[str, Optional[str]]:
+        user_email_address = None
+
+        if not campaign:
+            return body, user_email_address
+
+        user_result = await self.session.execute(
+            select(User).where(User.id == campaign.user_id)
+        )
+        user = user_result.scalar_one_or_none()
+
+        if not user:
+            return body, user_email_address
+
+        if user.email_signature:
+            body = f"{body}<br><br>{user.email_signature}"
+
+        if user.first_name:
+            user_email_address = get_user_email(user.first_name)
+
+        return body, user_email_address
 
     async def _handle_send_failure(
         self,
