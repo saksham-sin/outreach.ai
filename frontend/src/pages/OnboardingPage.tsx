@@ -29,8 +29,13 @@ export function OnboardingPage() {
         job_title: user.job_title || '',
         email_signature: user.email_signature || '',
       });
+      
+      // Auto-redirect to dashboard if onboarding is complete
+      if (user.profile_completed) {
+        navigate('/', { replace: true });
+      }
     }
-  }, [user]);
+  }, [user, navigate]);
 
   const handleSaveProfile = async () => {
     if (isSavingProfile) return;

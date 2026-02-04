@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth';
 import { campaignsApi } from '../api';
 import { Button, Spinner, StatusBadge, EmptyState, Header, Countdown, ConfirmModal, SearchableSelect } from '../components';
 import { CampaignStatus } from '../types';
@@ -14,6 +15,7 @@ interface CampaignWithNextSend extends Campaign {
 }
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<CampaignWithNextSend[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sendingNowId, setSendingNowId] = useState<string | null>(null);
@@ -24,6 +26,13 @@ export function DashboardPage() {
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const navigate = useNavigate();
   const replyMode = (import.meta.env.VITE_REPLY_MODE || 'SIMULATED').toUpperCase();
+
+  // Redirect to onboarding if profile is not completed
+  useEffect(() => {
+    if (user && !user.profile_completed) {
+      navigate('/onboarding', { replace: true });
+    }
+  }, [user, navigate]);
 
   const fetchCampaigns = async () => {
     try {
