@@ -1,157 +1,151 @@
-# Outreach.AI
+# Outreach.ai
 
-AI-powered email outreach platform that automates personalized cold email campaigns with intelligent scheduling, follow-ups, and reply detection.
+👉 **Live App:** https://app.outreachai-demo.online
 
-## What is Outreach.AI?
-
-Outreach.AI helps you run email campaigns at scale. Create campaigns, upload leads, generate AI-powered emails, and let the system automatically send emails and manage follow-ups. The platform detects replies automatically and stops follow-ups when prospects respond.
-
-## Features
-
-- ✅ **Campaign Builder** - Create email campaigns with a simple wizard
-- ✅ **Lead Management** - Import leads from CSV, manage lists
-- ✅ **AI Email Generation** - Generate personalized emails using OpenAI GPT
-- ✅ **Automated Scheduling** - Schedule emails with automatic follow-ups
-- ✅ **Reply Detection** - Automatically detect and stop follow-ups when replies arrive
-- ✅ **Email Delivery** - Send via Resend
-- ✅ **Magic Link Auth** - Passwordless authentication
-- ✅ **Email Timeline** - View email history for each lead
-
-## Quick Start
-
-### Prerequisites
-
-- **Python** 3.11+
-- **Node.js** 18+
-- **PostgreSQL** 15+
-- **OpenAI API Key** (for AI email generation)
-- **Resend** account (for email sending)
-
-### 1. Backend Setup
-
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-.\venv\Scripts\activate  # Windows
-source venv/bin/activate  # macOS/Linux
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env file
-cp .env.example .env
-# Edit .env with your API keys and database URL
-
-# Run database migrations
-alembic upgrade head
-
-# Start the API server
-uvicorn app.main:app --reload --port 8000
-```
-
-The API will be available at `http://localhost:8000`  
-Swagger docs: `http://localhost:8000/docs`
-
-### 2. Background Worker (new terminal)
-
-```bash
-cd backend
-source venv/bin/activate  # or .\venv\Scripts\activate on Windows
-
-# Run the background worker for email processing
-python -m app.services.worker
-```
-
-### 3. Frontend Setup (new terminal)
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-The frontend will be available at `http://localhost:5173`
-
-### 4. Database Setup
-
-Create a PostgreSQL database:
-
-```bash
-createdb outreach_ai
-```
-
-Or using Railway:
-
-```bash
-npm install -g @railway/cli
-railway login
-railway init
-railway up
-```
+A production-ready Mini-SaaS for AI-powered email outreach.
+Built for sales teams and SDRs to run reliable, personalized cold email campaigns without the overhead of enterprise tooling.
 
 ---
 
-## How to Use
+## What This Is
 
-### 1. Create Account
-- Go to `http://localhost:5173`
-- Enter your email and click "Send Magic Link"
-- Check your email and click the link to sign in
+Cold outreach at scale is manual and error-prone. Sales teams juggle inboxes, spreadsheets, and reminders, often losing track of what was sent, when follow-ups are due, and who has already replied.
 
-### 2. Create Campaign
-- Click "New Campaign" in the dashboard
-- Follow the wizard:
-  1. **Campaign Details** - Name, description, email subject
-  2. **Upload Leads** - Import CSV with lead information
-  3. **Create Template** - Write email body or generate with AI
-  4. **Configure Follow-ups** - Set delays and follow-up sequences
-  5. **Review & Launch** - Verify and launch the campaign
+Outreach.ai is **not an email client**. It is a system for **running outbound campaigns end-to-end** — with AI-assisted personalization, scheduled follow-ups, and inbound reply detection that automatically stops sequences when a prospect responds.
 
-### 3. Monitor Campaign
-- View campaign status on the dashboard
-- Check email delivery status
-- Monitor replies and engagement
-- View email timeline for each lead
+This was built as a hosted Mini-SaaS rather than a script because campaigns are stateful, replies require webhooks, and reliability matters.
 
 ---
 
-## Environment Variables
+## Core Workflow (Happy Path)
 
-Create `.env` file in `backend/` directory with these variables:
+1. Sign in using a magic link (no passwords)
+2. Create a campaign
+3. Import leads (CSV-based for v1)
+4. Write or generate an email template
+5. Schedule the campaign
+6. Emails send automatically
+7. Follow-ups trigger on time
+8. Replies immediately halt future follow-ups
 
-```env
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/outreach_ai
+The system is intentionally constrained. One campaign, one sequence, predictable behavior.
 
-# Security
-SECRET_KEY=your-secret-key-here
+---
 
-# OpenAI
-OPENAI_API_KEY=sk-your-key-here
+## Key Product Decisions
 
-# Email (Resend)
-RESEND_API_KEY=re_your_key_here
-RESEND_FROM_DOMAIN=example.com
+### Email-Only for v1
 
-# Dual Sender Configuration
-EMAIL_AUTH_FROM_ADDRESS=no-reply@example.com
-EMAIL_AUTH_FROM_NAME=Your App Name
-EMAIL_OUTREACH_FROM_ADDRESS=hello@example.com
-EMAIL_OUTREACH_FROM_NAME=Your App Name
-EMAIL_OUTREACH_REPLY_TO=hello@example.com
+Email was chosen deliberately:
+- Highest ROI channel for outbound
+- Most compliance-sensitive
+- Stable compared to platform-dependent channels
 
-# URLs
-APP_BASE_URL=http://localhost:8000
-FRONTEND_URL=http://localhost:5173
+Depth over breadth.
 
-# Frontend
-VITE_BACKEND_HOST=http://localhost:8000
-```
+---
 
-See `.env.example` for all available options.
+### Magic Links Instead of Passwords
+
+Magic links reduce friction and infrastructure complexity:
+- No password storage
+- No reset flows
+- Smaller attack surface
+
+This fits a self-serve SaaS with known users.
+
+---
+
+### One Signature Per User
+
+A single signature keeps the model simple and covers most use cases. Per-template signatures add cognitive and data-model complexity without meaningful upside.
+
+---
+
+### Minute-Level Scheduling
+
+Minute-level scheduling exists primarily to enable fast demos and testing. In production usage, campaigns can still be spaced hourly or daily.
+
+Supporting finer granularity surfaces edge cases early without constraining real usage.
+
+---
+
+## Handling Follow-ups Safely ("Waiting" Problem)
+
+Follow-ups should never send after a reply arrives.
+
+The system guarantees this by:
+- Persisting every scheduled send in the database
+- Checking reply state immediately before sending
+- Skipping and marking jobs complete if a reply exists
+
+The database is the source of truth. No distributed locks, no queues, no race conditions.
+
+---
+
+## AI Usage
+
+AI is used selectively:
+- Personalizing email bodies
+- Generating a user signature
+
+AI is *not* used for scheduling, reply detection, or scoring. Those remain deterministic.
+
+Generation happens synchronously so users can see and approve output before saving.
+
+---
+
+## Email Delivery & Reply Detection
+
+**This is a fully functional, end-to-end system with no simulation.**
+
+Emails are sent via **Resend** and delivered to real inboxes. Inbound replies are handled via webhooks. When a reply is received:
+- The lead is marked complete
+- All pending follow-ups are halted immediately
+
+No inbox polling. No heuristics. No test mode.
+
+---
+
+## Architecture (High-Level)
+
+- **Frontend:** React + TypeScript + Vite
+- **Backend:** FastAPI
+- **Background Worker:** scheduling, retries, dispatch
+- **Database:** PostgreSQL
+
+The system favors clarity and debuggability over infrastructure complexity.
+
+---
+
+## UI Philosophy
+
+The UI is intentionally simple and workflow-focused.
+
+This aligns with the expectation that the system could later be integrated into **Prosp.ai**, where branding and visual polish would be handled at the platform level.
+
+---
+
+## What’s Intentionally Out of Scope
+
+- Multi-channel outreach
+- A/B testing
+- Analytics dashboards
+- Per-user sending domains
+- Rate limiting
+
+The focus is the core loop: **create → send → wait → stop on reply**.
+
+---
+
+## Demo
+
+Reviewers can log in with any email, create a campaign, send real emails, and reply to see follow-ups stop automatically.
+
+---
+
+## Closing Note
+
+This project prioritizes judgment over breadth.
+
+The goal was to ship a small, reliable system that behaves predictably under real conditions — and to stop once the happy path was solid.
